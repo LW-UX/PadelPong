@@ -1,0 +1,9 @@
+{
+  "name": "padelpong",
+  "private": true,
+  "scripts": {
+    "check:naming": "node tools/check-pong-naming.mjs",
+    "test:game": "node --test tests/pong-*.test.js",
+    "test": "npm run check:naming && npm run test:game"
+  }
+}
