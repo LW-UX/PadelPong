@@ -41,7 +41,7 @@ Diese Datei ist die kanonische Quelle für das saisonunabhängige Spiel PadelPon
 - Nur freiwillig eingetragene Siege gegen den Computer werden in Supabase gespeichert. Online- und Laptop-Duelle sowie Niederlagen erscheinen nicht.
 - Schwierigkeit und Regelversion werden beim Partiestart festgelegt und unveränderlich mit dem Sieg gespeichert. Änderungen an Physik oder Schwierigkeit können getrennte Listen erzeugen; frühere Regelversionen bleiben archiviert.
 - Rangfolge: besseres Ergebnis vor schlechterem, danach kürzere Spielzeit. Exakt gleiche Leistungen teilen einen Rang; der längste Ballwechsel ist reine Zusatzinformation.
-- Je Schwierigkeit und Regelversion werden die besten acht Einträge sowie gegebenenfalls der eigene zuletzt gespeicherte Sieg angezeigt.
+- Je Schwierigkeit und Regelversion werden die besten zehn Einträge sowie gegebenenfalls der eigene zuletzt gespeicherte Sieg angezeigt.
 - Namen sind frei gewählt, nicht identitätsgeprüft und werden im Browser sowie serverseitig gegen Format und Sperrliste geprüft. Gleiche Namen sind zulässig.
 - Die Bestenliste ist eine Freizeitwertung ohne serverseitige Verifikation des Spielverlaufs. Derselbe Sieg darf höchstens einmal gespeichert werden.
 

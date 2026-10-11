@@ -83,19 +83,19 @@ begin
   end loop;
   perform public.submit_pong_win(v_own, 'QAEigen', 7, 6, 86400000, p_ruleset => 'v2');
   v_result := public.get_pong_leaderboard(v_own, p_ruleset => 'v2');
-  if jsonb_array_length(v_result->'entries') <> 8 or v_result->'ownEntry'->>'name' <> 'QAEigen'
-    or (v_result->'ownEntry'->>'rank')::bigint <= 8 then
-    raise exception 'Own result outside top eight is missing';
+  if jsonb_array_length(v_result->'entries') <> 10 or v_result->'ownEntry'->>'name' <> 'QAEigen'
+    or (v_result->'ownEntry'->>'rank')::bigint <= 10 then
+    raise exception 'Own result outside top ten is missing';
   end if;
   select round_id into v_top from public.pong_wins where ruleset = 'v2' and difficulty = 'hard' order by computer_score, duration_ms, created_at, round_id limit 1;
   v_result := public.get_pong_leaderboard(v_top, p_ruleset => 'v2');
   if v_result->'ownEntry' <> 'null'::jsonb or not (v_result->'entries'->0->>'isOwn')::boolean then
-    raise exception 'Top eight own result must be marked without duplicate';
+    raise exception 'Top ten own result must be marked without duplicate';
   end if;
   v_result := public.get_pong_leaderboard(gen_random_uuid(), p_ruleset => 'v2');
   if v_result->'ownEntry' <> 'null'::jsonb then raise exception 'Unknown round has an own result'; end if;
-  -- Even a tied rank of 1 belongs below the table when the exact round is outside its eight rows.
-  for i in 1..8 loop
+  -- Even a tied rank of 1 belongs below the table when the exact round is outside its ten rows.
+  for i in 1..10 loop
     perform public.submit_pong_win(gen_random_uuid(), 'QAGleich' || i, 7, 0, 1, p_ruleset => 'v2');
   end loop;
   perform public.submit_pong_win(v_tied, 'QAGleichEigen', 7, 0, 1, 999, p_ruleset => 'v2');
@@ -103,7 +103,7 @@ begin
   v_result := public.get_pong_leaderboard(v_tied, p_ruleset => 'v2');
   if v_result->'ownEntry'->>'name' is distinct from 'QAGleichEigen'
     or (v_result->'ownEntry'->>'rank')::bigint is distinct from 1::bigint then
-    raise exception 'Tied own result outside eight rows is missing';
+    raise exception 'Tied own result outside ten rows is missing';
   end if;
   if (v_result->'ownEntry'->>'bestRally')::integer is distinct from 999
     or (v_result->'ownEntry'->>'createdAt')::timestamptz is distinct from
@@ -113,12 +113,12 @@ begin
   v_result := public.get_pong_leaderboard(p_ruleset => 'v2');
   if not ((v_result->'entries'->0) ? 'bestRally')
     or not ((v_result->'entries'->0) ? 'createdAt') then
-    raise exception 'Top eight details missing';
+    raise exception 'Top ten details missing';
   end if;
   if (select best_rally from public.pong_wins where round_id = v_second) is not null then
     raise exception 'Omitting the optional rally must retain unknown rally';
   end if;
-  if jsonb_array_length(v_result->'entries') > 8 then raise exception 'Top eight exceeds limit'; end if;
+  if jsonb_array_length(v_result->'entries') > 10 then raise exception 'Top ten exceeds limit'; end if;
   if (v_result->'entries'->0) ? 'round_id' then raise exception 'Round token is public'; end if;
 end;
 $$;

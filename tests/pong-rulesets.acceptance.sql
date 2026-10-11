@@ -61,9 +61,9 @@ begin
   end loop;
   perform public.submit_pong_win(v_own, 'QAOwn', 7, 6, 86400000, 13, 'easy', 'v2');
   v_result := public.get_pong_leaderboard(v_own, 'easy', 'v2');
-  if jsonb_array_length(v_result->'entries') <> 8 or v_result->'ownEntry'->>'name' is distinct from 'QAOwn'
-    or (v_result->'ownEntry'->>'rank')::bigint <= 8 then
-    raise exception 'V2 must show top eight and own entry';
+  if jsonb_array_length(v_result->'entries') <> 10 or v_result->'ownEntry'->>'name' is distinct from 'QAOwn'
+    or (v_result->'ownEntry'->>'rank')::bigint <= 10 then
+    raise exception 'V2 must show top ten and own entry';
   end if;
   v_result := public.get_pong_leaderboard(v_own, 'hard', 'v2');
   if v_result->'ownEntry' <> 'null'::jsonb or exists (

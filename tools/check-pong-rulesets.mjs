@@ -38,6 +38,7 @@ try {
     'delete from public.pong_wins where round_id = $1'
   ]) await rejected(query, [ids[0]], /PONG_RULESET_CLOSED/);
   await rejected("insert into public.pong_wins (round_id, display_name, human_score, computer_score, duration_ms) values (gen_random_uuid(), 'QANew', 7, 1, 30000)", [], /PONG_RULESET_CLOSED/);
+  await sql('supabase/migrations/202610110001_top_ten_leaderboard.sql');
   await sql('tests/pong-leaderboard.acceptance.sql');
   await sql('tests/pong-rulesets.acceptance.sql');
   assert.deepEqual(await call('select * from public.pong_wins order by round_id'), after);
