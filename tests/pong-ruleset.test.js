@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const physics = import('../physics.mjs');
+const physics = import('../src/physics.mjs');
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
 const absent = [{ offset: 100, y: 100 }, { offset: 100, y: 100 }];
 function rally(p, side, ball = {}) {
@@ -130,7 +130,7 @@ test('signed power follows smoothed actual movement and decays at the rear limit
 });
 
 test('ruleset is captured by state, copied into a win and never supplied as a save-time fallback', async () => {
-  const p = await physics, l = await import('../leaderboard.mjs');
+  const p = await physics, l = await import('../src/leaderboard.mjs');
   const s = p.createState(); p.start(s); assert.equal(s.ruleset, 'v2');
   Object.assign(s, { phase: 'over', winner: 1, score: [2, 7] });
   const entry = l.winningEntry(s, 'round', 'easy'); s.ruleset = 'classic';
@@ -141,7 +141,7 @@ test('ruleset is captured by state, copied into a win and never supplied as a sa
 });
 
 test('an archived-version error asks for a reload rather than a retry', async () => {
-  const { createLeaderboardApi } = await import('../leaderboard.mjs');
+  const { createLeaderboardApi } = await import('../src/leaderboard.mjs');
   const api = createLeaderboardApi({ url: 'https://example.test', publishableKey: 'public' }, async () => ({ ok: false, status: 400, json: async () => ({ message: 'PONG_RULESET_CLOSED' }) }));
   await assert.rejects(api.save({ roundId: 'old', ruleset: 'classic' }, 'Ludi'), /lade die Seite neu/);
 });

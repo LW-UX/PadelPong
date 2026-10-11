@@ -3,9 +3,9 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
-import { OnlineSession, generateCode } from '../online.mjs';
+import { OnlineSession, generateCode } from '../src/online.mjs';
 const sandbox = { window: {} };
-vm.runInNewContext(await readFile(new URL('../supabase-config.js', import.meta.url), 'utf8'), sandbox);
+vm.runInNewContext(await readFile(new URL('../src/supabase-config.js', import.meta.url), 'utf8'), sandbox);
 const config = sandbox.window.PADEL_SUPABASE_CONFIG;
 const rooms = [];
 const host = new OnlineSession({ role: 'host', code: generateCode(), config }); rooms.push(host);

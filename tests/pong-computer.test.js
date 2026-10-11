@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const physics = import('../physics.mjs');
-const computer = import('../computer.mjs');
+const physics = import('../src/physics.mjs');
+const computer = import('../src/computer.mjs');
 function near(a, b) { assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`); }
 function seeded(seed) { return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }; }
 
@@ -121,7 +121,7 @@ test('seeded CPU matches behave identically at 30 and 60 FPS on both difficultie
 });
 
 test('difficulty preferences default to easy and tolerate blocked or invalid storage', async () => {
-  const { readDifficulty, saveDifficulty, requireDifficulty } = await import('../difficulty.mjs');
+  const { readDifficulty, saveDifficulty, requireDifficulty } = await import('../src/difficulty.mjs');
   const old = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   try {
     Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('blocked'); } });
@@ -178,7 +178,7 @@ test('easy is beatable with a slower return controller within three minutes', as
 });
 
 test('very easy is retained for tournaments without becoming a public ranking difficulty', async () => {
-  const { COMPUTER_PROFILES, DIFFICULTIES, requireDifficulty } = await import('../difficulty.mjs');
+  const { COMPUTER_PROFILES, DIFFICULTIES, requireDifficulty } = await import('../src/difficulty.mjs');
   assert.deepEqual(COMPUTER_PROFILES.very_easy, { label: 'Sehr leicht', reaction: .4, speed: .55, delay: .45, delaySpread: .15, lookahead: .15 });
   assert.ok(Object.isFrozen(COMPUTER_PROFILES.very_easy));
   assert.equal(DIFFICULTIES.very_easy, undefined);

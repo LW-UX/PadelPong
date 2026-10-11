@@ -18,7 +18,7 @@ async function inputHarness(width = 272, height = 496, withJoystick = true) {
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 })
   });
   let toggles = 0;
-  const { createInput } = await import('../input.mjs');
+  const { createInput } = await import('../src/input.mjs');
   const input = createInput(canvas, withJoystick ? joystick : null, () => ({ offset: 0, y: 17 }), () => toggles++);
   return { input, canvas, joystick, win, toggles: () => toggles, close() { input.destroy(); global.window = previousWindow; } };
 }
@@ -78,7 +78,7 @@ test('local duel reads simultaneous opposing diagonals independently and release
     for (const code of ['ArrowUp', 'ArrowRight', 'KeyS', 'KeyA']) event(h.win, 'keydown', { code });
     assert.deepEqual(h.input.read(), { x: 1, y: -1 });
     assert.deepEqual(h.input.readOpponent(), { x: -1, y: 1 });
-    const { createState, start, step, C } = await import('../physics.mjs');
+    const { createState, start, step, C } = await import('../src/physics.mjs');
     const state = createState(); start(state);
     for (let i = 0; i < 12; i++) step(state, h.input.read(), h.input.readOpponent());
     assert.ok(state.teams[1].offset > 0 && state.teams[1].y < 17);

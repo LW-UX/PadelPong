@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 test('countdown presents 3, 2, 1 and GO in four equal sound sections', async () => {
-  const { COUNTDOWN_DURATION_MS, EFFECT_SOUND_NAMES, MUSIC_SOUND_NAMES, backgroundMusicVolume, countdownLabel, soundVolume } = await import('../audio.mjs');
+  const { COUNTDOWN_DURATION_MS, EFFECT_SOUND_NAMES, MUSIC_SOUND_NAMES, backgroundMusicVolume, countdownLabel, soundVolume } = await import('../src/audio.mjs');
   assert.deepEqual(EFFECT_SOUND_NAMES, ['countdown', 'dodge', 'hit', 'pointWon', 'pointLost']);
   assert.deepEqual(MUSIC_SOUND_NAMES, ['gameMusic', 'gameOver', 'victory']);
   assert.equal(backgroundMusicVolume(false), 0.22);
@@ -31,7 +31,7 @@ test('countdown presents 3, 2, 1 and GO in four equal sound sections', async () 
 });
 
 test('a score increase selects the point sound from the local player perspective', async () => {
-  const { contactSoundName, pointSoundName } = await import('../audio.mjs');
+  const { contactSoundName, pointSoundName } = await import('../src/audio.mjs');
   assert.equal(pointSoundName([2, 3], [2, 4], 1), 'pointWon');
   assert.equal(pointSoundName([2, 3], [3, 3], 0), 'pointLost');
   assert.equal(pointSoundName([2, 3], [2, 3], 1), null);
@@ -43,7 +43,7 @@ test('a score increase selects the point sound from the local player perspective
 });
 
 test('laptop duels celebrate either team while solo and online retain perspective sounds', async () => {
-  const { matchSoundName, pointSoundName } = await import('../audio.mjs');
+  const { matchSoundName, pointSoundName } = await import('../src/audio.mjs');
   for (const winner of [0, 1]) {
     const score = [6, 6];
     score[winner]++;
@@ -56,7 +56,7 @@ test('laptop duels celebrate either team while solo and online retain perspectiv
 });
 
 test('sound effects apply their individually normalized playback level', async () => {
-  const { createSoundEffects } = await import('../audio.mjs');
+  const { createSoundEffects } = await import('../src/audio.mjs');
   const voices = [];
   const template = { cloneNode() {
     const voice = { volume: 0, preload: '', paused: false, currentTime: 0, addEventListener() {}, play: () => Promise.resolve(), pause() { this.paused = true; } };
@@ -71,7 +71,7 @@ test('sound effects apply their individually normalized playback level', async (
 });
 
 test('music and effects switches stop only the sounds assigned to their channel', async () => {
-  const { createSoundEffects, EFFECT_SOUND_NAMES, MUSIC_SOUND_NAMES } = await import('../audio.mjs');
+  const { createSoundEffects, EFFECT_SOUND_NAMES, MUSIC_SOUND_NAMES } = await import('../src/audio.mjs');
   const template = { cloneNode() {
     return { paused: false, currentTime: 0, addEventListener() {}, play: () => Promise.resolve(), pause() { this.paused = true; } };
   } };
@@ -96,7 +96,7 @@ test('music and effects switches stop only the sounds assigned to their channel'
 });
 
 test('music and effects share one unlocked low-latency audio context and can overlap', async () => {
-  const { createSoundEffects, MUSIC_SOUND_NAMES } = await import('../audio.mjs');
+  const { createSoundEffects, MUSIC_SOUND_NAMES } = await import('../src/audio.mjs');
   const sources = [], gains = [], activationOrder = [];
   let contexts = 0;
   class FakeAudioContext {

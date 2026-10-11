@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const leaderboard = import('../leaderboard.mjs');
-const physics = import('../physics.mjs');
+const leaderboard = import('../src/leaderboard.mjs');
+const physics = import('../src/physics.mjs');
 test('only a completed human win creates an immutable leaderboard entry', async () => {
   const { winningEntry } = await leaderboard;
   for (const state of [
@@ -59,7 +59,7 @@ test('blocked names cannot bypass case, simple leetspeak, suffixes or repeated l
 });
 test('the private database blacklist starts with exactly the same rules as the browser', async () => {
   const fs = require('node:fs'); const path = require('node:path');
-  const { BLOCKED_NAME_RULES } = await import('../name-policy.mjs');
+  const { BLOCKED_NAME_RULES } = await import('../src/name-policy.mjs');
   const sql = fs.readFileSync(path.join(__dirname, '../supabase/baseline/001_pong_leaderboard.sql'), 'utf8');
   const seeded = [...sql.matchAll(/^  \('([^']+)', '(contains|exact)'\)/gm)].map(([, term, match]) => ({ term, match }));
   assert.deepEqual(seeded, BLOCKED_NAME_RULES);

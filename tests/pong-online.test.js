@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 async function harness() {
-  const { OnlineSession, ONLINE } = await import('../online.mjs');
+  const { OnlineSession, ONLINE } = await import('../src/online.mjs');
   let now = 0, queue = [], endpoints = [], rooms = [];
   const connect = (_, code, callbacks) => {
     const endpoint = { code, callbacks, active: true, online: true };
@@ -36,7 +36,7 @@ async function harness() {
 }
 
 test('room codes normalize typing and reject malformed input', async () => {
-  const { normalizeCode, generateCode } = await import('../online.mjs');
+  const { normalizeCode, generateCode } = await import('../src/online.mjs');
   assert.equal(normalizeCode(' k7m-x4p '), 'K7MX4P');
   for (const value of ['', 'ABC', 'ABCDEF7', 'AAAAA0', '<html>']) assert.throws(() => normalizeCode(value));
   for (let i = 0; i < 100; i++) assert.match(generateCode(), /^[A-HJ-NP-Z2-9]{6}$/);
@@ -110,8 +110,8 @@ test('rematch resets score and clock and ignores actions from a previous round',
 });
 
 test('perspective rotation is reversible and malformed or stale snapshots are ignored', async () => {
-  const { perspective, validSnapshot } = await import('../online.mjs');
-  const { createState } = await import('../physics.mjs');
+  const { perspective, validSnapshot } = await import('../src/online.mjs');
+  const { createState } = await import('../src/physics.mjs');
   const state = createState(); state.teams[0].offset = .7; state.ball.vx = 4; state.ball.vy = 7;
   state.effectSequence = 1; state.effects.push({ id: 1, x: 2, y: 5, age: .1, kind: 'hit' });
   assert.deepEqual(perspective(perspective(state, 0), 0), state);
@@ -135,7 +135,7 @@ test('delayed readiness from before a pause cannot restart the resumed room', as
 });
 
 test('Realtime transport waits for join, rejects unrelated messages and reconnects after socket loss', async t => {
-  const { connectRealtime } = await import('../realtime.mjs');
+  const { connectRealtime } = await import('../src/realtime.mjs');
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
   const sockets = [], statuses = [], messages = [];
   class Socket {
@@ -171,7 +171,7 @@ test('old online protocol cannot claim a seat and classic snapshots are rejected
   guest.receive({ v: 1, from: 'old-host', to: 'guest', type: 'accepted', round: 0 });
   assert.equal(guest.peer, null);
   h.advance(11000); assert.equal(guest.stage, 'ended'); assert.match(guest.message, /Kein offenes Spiel/);
-  const { validSnapshot } = await import('../online.mjs');
+  const { validSnapshot } = await import('../src/online.mjs');
   assert.equal(validSnapshot({ ...h.host.state, ruleset: 'classic' }), false);
 });
 
@@ -184,7 +184,7 @@ test('guest backward movement produces negative power on the host and in the rot
 });
 
 async function landingRenderer(t) {
-  const { createRenderer } = await import('../renderer.mjs');
+  const { createRenderer } = await import('../src/renderer.mjs');
   const originalImage = Object.getOwnPropertyDescriptor(globalThis, 'Image');
   globalThis.Image = class { async decode() {} };
   t.after(() => {
@@ -210,7 +210,7 @@ function landingSquare(landing) {
 }
 
 test('guest renders one stationary landing square throughout an unchanged flight at 30 and 60 FPS', async t => {
-  const { C, predictLanding, simulateBall } = await import('../physics.mjs');
+  const { C, predictLanding, simulateBall } = await import('../src/physics.mjs');
   const draw = await landingRenderer(t), h = await harness(), guest = h.add('guest', 'guest');
   let now = 0; guest.now = () => now;
   h.host.stage = 'playing'; h.host.state.phase = 'rally';
@@ -238,7 +238,7 @@ test('guest renders one stationary landing square throughout an unchanged flight
 });
 
 test('guest landing follows host contacts and faults; pause and local reset preserve the renderer behavior', async t => {
-  const { C, createState, predictLanding, hitBall, simulateBall, reset, start } = await import('../physics.mjs');
+  const { C, createState, predictLanding, hitBall, simulateBall, reset, start } = await import('../src/physics.mjs');
   const draw = await landingRenderer(t), h = await harness(), guest = h.add('guest', 'guest');
   h.host.stage = 'playing'; h.host.state.phase = 'rally';
   Object.assign(h.host.state.ball, { x: 5, y: 12, z: .01, vx: 0, vy: 5, vz: -2, lastHit: 0, feed: false });

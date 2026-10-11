@@ -14,8 +14,9 @@ Für die manuelle Prüfung wird das Repository über einen lokalen Webserver ge�
 
 ## Struktur
 
-- `index.html`, `pong.css` und die Module im Repository-Root bilden die Website.
-- Audio, Spielfeldgrafik und Fonts werden lokal ausgeliefert.
+- `index.html` ist der Einstiegspunkt der statischen Website.
+- `src/` enthält die Spielmodule und die öffentliche Supabase-Konfiguration.
+- `assets/` bündelt Styles, Audio, Spielfeldgrafik, Favicon und Fonts.
 - `tests/` enthält die dauerhaften Spiel- und Schnittstellentests.
 - `supabase/baseline/` rekonstruiert das Pong-Schema ausschließlich für isolierte Datenbanktests.
 - Neue produktive Pong-Migrationen werden künftig unter `supabase/migrations/` angelegt.
@@ -23,7 +24,7 @@ Für die manuelle Prüfung wird das Repository über einen lokalen Webserver ge�
 
 ## Supabase
 
-PadelPong nutzt vorerst dieselbe Supabase-Instanz wie die Padel-Liga. Der Browser verwendet nur die öffentliche Projektadresse und den öffentlichen Publishable Key aus `supabase-config.js`. Geheimschlüssel gehören ausschließlich in den lokalen, ignorierten Ordner `.codex-secrets/`.
+PadelPong nutzt vorerst dieselbe Supabase-Instanz wie die Padel-Liga. Der Browser verwendet nur die öffentliche Projektadresse und den öffentlichen Publishable Key aus `src/supabase-config.js`. Geheimschlüssel gehören ausschließlich in den lokalen, ignorierten Ordner `.codex-secrets/`.
 
 Produktive Datenbankzugriffe erfolgen nur über `tools/supabase-mcp.mjs` beziehungsweise `tools/run-supabase-mcp.sh`. Schreibaktionen benötigen vor der Ausführung eine ausdrückliche Freigabe.
 

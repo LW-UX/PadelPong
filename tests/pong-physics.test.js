@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const physics = import('../physics.mjs');
+const physics = import('../src/physics.mjs');
 function near(a, b, tolerance = 1e-6) { assert.ok(Math.abs(a - b) < tolerance, `${a} != ${b}`); }
 async function scenario(ball) {
   const p = await physics, s = p.createState();
@@ -209,20 +209,20 @@ test('Pong page is a standalone root site without league navigation', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.ok(!/app\.js|supabase-js|chart\.js/.test(html));
   assert.match(html, /Padel<span>Pong/);
-  assert.match(html, /src="supabase-config\.js"/);
-  assert.match(html, /href="pong\.css/);
+  assert.match(html, /src="src\/supabase-config\.js"/);
+  assert.match(html, /href="assets\/styles\/pong\.css/);
   assert.doesNotMatch(html, /\.\.\/|back-link|Padel-Liga|saison/i);
   assert.match(html, /<button[^>]+id="fps"[^>]*>60 FPS<\/button>/);
   assert.ok(!/<select[^>]+id="fps"/.test(html));
   assert.match(html, /<canvas id="court"[\s\S]*?<div class="countdown-display" id="countdown-display"[\s\S]*?<div class="game-overlay" id="game-overlay">/);
-  const main = fs.readFileSync(path.join(root, 'main.mjs'), 'utf8');
+  const main = fs.readFileSync(path.join(root, 'src', 'main.mjs'), 'utf8');
   assert.match(main, /const durationMs = COUNTDOWN_DURATION_MS;/);
   assert.match(main, /return now - localCountdown\.startedAt;/);
   assert.doesNotMatch(main, /back-link|URLSearchParams|saison/);
 });
 
 test('computer speed stays below the player limit including diagonal movement', async () => {
-  const { createComputer } = await import('../computer.mjs');
+  const { createComputer } = await import('../src/computer.mjs');
   const p = await physics;
   for (const [offset, y, expected] of [[1.8, 3.2, 0.82 * 0.95], [0, 8, 0.65 * 0.95], [1.8, 8, 0.95]]) {
     const state = p.createState();
