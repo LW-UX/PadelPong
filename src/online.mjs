@@ -1,7 +1,8 @@
-import { C, clamp, createState, createClock, start, pause, reset, step, moveTeam, predictLanding } from './physics.mjs?v=2026-09-14-point-sounds';
+import { C, clamp, createState, createClock, start, pause, reset, step, moveTeam, predictLanding } from './physics.mjs?v=2026-10-11-lob-smash';
 import { connectRealtime } from './realtime.mjs?v=2026-09-12-rules-v2';
 import { RULESET } from './ruleset.mjs?v=2026-09-12-rules-v2';
 import { COUNTDOWN_DURATION_MS } from './audio.mjs?v=2026-09-13-sound-effects';
+import { GAMEPLAY } from './gameplay.mjs';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ZERO = Object.freeze({ x: 0, y: 0 });
@@ -23,6 +24,7 @@ export function perspective(state, side) {
   const view = structuredClone(state);
   if (side === 0) {
     view.score.reverse();
+    view.pendingLob?.reverse();
     view.winner = view.winner === null ? null : 1 - view.winner;
     view.teams.reverse();
     view.teams.forEach((t, i) => Object.assign(t, { side: i, offset: -t.offset, y: C.length - t.y, vx: -t.vx, vy: -t.vy }));
@@ -34,15 +36,25 @@ export function perspective(state, side) {
 }
 export function validSnapshot(s) {
   const finite = (o, keys) => o && keys.every(k => Number.isFinite(o[k]) && Math.abs(o[k]) < 1e6);
-  return s && s.ruleset === RULESET && ['ready', 'rally', 'point', 'paused', 'over'].includes(s.phase)
+  return s && s.ruleset === RULESET && (s.variant === undefined || s.variant === GAMEPLAY.standard.id) && ['ready', 'rally', 'point', 'paused', 'over'].includes(s.phase)
     && ['rally', 'point'].includes(s.resumePhase) && [null, 0, 1].includes(s.winner)
     && Array.isArray(s.score) && s.score.length === 2 && s.score.every(n => Number.isInteger(n) && n >= 0 && n <= 7)
     && finite(s, ['time', 'pointTimer', 'rallyHits', 'bestRally', 'effectSequence']) && s.time >= 0 && Number.isInteger(s.effectSequence) && s.effectSequence >= 0
     && Array.isArray(s.teams) && s.teams.length === 2 && s.teams.every((t, i) => t.side === i && finite(t, ['offset', 'y', 'vx', 'vy', 'power']))
-    && finite(s.ball, ['x', 'y', 'z', 'vx', 'vy', 'vz', 'bounces']) && [0, 1].includes(s.ball.lastHit)
+    && finite(s.ball, ['x', 'y', 'z', 'vx', 'vy', 'vz', 'bounces']) && [0, 1].includes(s.ball.lastHit) && (s.ball.shotType === undefined || ['feed', 'normal'].includes(s.ball.shotType))
     && typeof s.ball.feed === 'boolean' && typeof s.message === 'string' && s.message.length < 200
+    && (s.pendingLob === undefined || (Array.isArray(s.pendingLob) && s.pendingLob.length === 2 && s.pendingLob.every(value => value === false)))
+    && (s.lastShot === undefined || ['feed', 'normal'].includes(s.lastShot))
     && (s.pointContactEffectId == null || (Number.isInteger(s.pointContactEffectId) && s.pointContactEffectId > 0 && s.pointContactEffectId <= s.effectSequence))
     && Array.isArray(s.effects) && s.effects.length <= 40 && s.effects.every(e => finite(e, ['id', 'x', 'y', 'age']) && Number.isInteger(e.id) && e.id > 0 && e.id <= s.effectSequence && ['hit', 'wall', 'bounce'].includes(e.kind));
+}
+export function onlineSnapshot(state) {
+  const snapshot = structuredClone(state);
+  delete snapshot.variant;
+  delete snapshot.pendingLob;
+  delete snapshot.lastShot;
+  delete snapshot.ball.shotType;
+  return snapshot;
 }
 
 // Host is the sole authority for seats, readiness, physics and score. Room messages
@@ -134,7 +146,7 @@ export class OnlineSession {
   }
   broadcast() {
     if (this.role !== 'host' || !this.peer || this.closed) return;
-    this.send('snapshot', { state: this.state, stage: this.stage, message: this.message, ready: this.ready, round: this.round, epoch: this.epoch, revision: ++this.revision, countdown: this.stage === 'countdown' ? Math.max(0, this.countdownUntil - this.now()) : 0 });
+    this.send('snapshot', { state: onlineSnapshot(this.state), stage: this.stage, message: this.message, ready: this.ready, round: this.round, epoch: this.epoch, revision: ++this.revision, countdown: this.stage === 'countdown' ? Math.max(0, this.countdownUntil - this.now()) : 0 });
   }
   hold(message) {
     if (this.closed) return;

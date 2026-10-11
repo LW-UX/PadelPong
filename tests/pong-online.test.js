@@ -110,12 +110,14 @@ test('rematch resets score and clock and ignores actions from a previous round',
 });
 
 test('perspective rotation is reversible and malformed or stale snapshots are ignored', async () => {
-  const { perspective, validSnapshot } = await import('../src/online.mjs');
+  const { perspective, validSnapshot, onlineSnapshot } = await import('../src/online.mjs');
   const { createState } = await import('../src/physics.mjs');
   const state = createState(); state.teams[0].offset = .7; state.ball.vx = 4; state.ball.vy = 7;
   state.effectSequence = 1; state.effects.push({ id: 1, x: 2, y: 5, age: .1, kind: 'hit' });
   assert.deepEqual(perspective(perspective(state, 0), 0), state);
   assert.ok(validSnapshot(state)); assert.ok(!validSnapshot({ ...state, ball: { ...state.ball, vx: NaN } }));
+  const legacy = onlineSnapshot(state);
+  assert.ok(validSnapshot(legacy)); assert.equal(legacy.variant, undefined); assert.equal(legacy.ball.shotType, undefined);
   const h = await harness(), guest = h.add('guest', 'guest'), before = structuredClone(guest.state);
   guest.receive({ v: h.ONLINE.protocol, from: 'host', to: 'guest', type: 'snapshot', revision: 999, state: { score: [7, 0] } });
   assert.deepEqual(guest.state, before);
@@ -211,6 +213,7 @@ function landingSquare(landing) {
 
 test('guest renders one stationary landing square throughout an unchanged flight at 30 and 60 FPS', async t => {
   const { C, predictLanding, simulateBall } = await import('../src/physics.mjs');
+  const { onlineSnapshot } = await import('../src/online.mjs');
   const draw = await landingRenderer(t), h = await harness(), guest = h.add('guest', 'guest');
   let now = 0; guest.now = () => now;
   h.host.stage = 'playing'; h.host.state.phase = 'rally';
@@ -232,7 +235,7 @@ test('guest renders one stationary landing square throughout an unchanged flight
       assert.ok(Math.abs(view.ball.y - (C.length - h.host.state.ball.y)) > .001);
     }
     assert.deepEqual(h.host.state, authoritative);
-    assert.deepEqual(guest.state, authoritative);
+    assert.deepEqual(guest.state, onlineSnapshot(authoritative));
     assert.equal(h.host.view().ball.landing, undefined);
   }
 });

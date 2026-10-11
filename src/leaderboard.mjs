@@ -1,6 +1,7 @@
 import { RULESET, requireRuleset } from './ruleset.mjs?v=2026-09-12-rules-v2';
 import { DIFFICULTIES, requireDifficulty } from './difficulty.mjs?v=2026-09-12-rules-v2';
 import { normalizeName } from './name-policy.mjs?v=2026-09-12-rules-v2';
+import { GAMEPLAY } from './gameplay.mjs';
 export { normalizeName } from './name-policy.mjs?v=2026-09-12-rules-v2';
 
 export function formatDuration(ms) {
@@ -20,6 +21,7 @@ export function formatEntryDate(value) {
   return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
 }
 export function winningEntry(state, roundId, difficulty = 'hard') {
+  if (state.variant !== undefined && state.variant !== GAMEPLAY.standard.id) return null;
   if (state.phase !== 'over' || state.winner !== 1 || state.score[1] !== 7 || state.score[0] < 0 || state.score[0] > 6) return null;
   return Object.freeze({ roundId, ruleset: requireRuleset(state.ruleset), difficulty: requireDifficulty(difficulty), humanScore: 7, computerScore: state.score[0], durationMs: Math.round(state.time * 1000), bestRally: state.bestRally });
 }

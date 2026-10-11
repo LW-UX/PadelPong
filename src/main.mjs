@@ -1,16 +1,18 @@
-import { createState, createClock, start, pause, reset, step } from './physics.mjs?v=2026-09-14-point-sounds';
-import { createComputer } from './computer.mjs?v=2026-09-13-easy-balanced';
+import { createState, createClock, start, pause, reset, step } from './physics.mjs?v=2026-10-11-lob-smash';
+import { createComputer } from './computer.mjs?v=2026-10-11-lob-smash';
 import { DIFFICULTIES, requireDifficulty, readDifficulty, saveDifficulty } from './difficulty.mjs?v=2026-09-13-easy-balanced';
-import { createInput } from './input.mjs?v=2026-09-12-rules-v2';
-import { createRenderer } from './renderer.mjs?v=2026-09-13-audio-events';
-import { mountLeaderboard, formatDuration } from './leaderboard.mjs?v=2026-09-12-game-over-actions-v2';
-import { OnlineSession, ONLINE, generateCode, normalizeCode } from './online.mjs?v=2026-09-14-point-sounds';
+import { createInput } from './input.mjs?v=2026-10-11-lob-smash';
+import { createRenderer } from './renderer.mjs?v=2026-10-11-lob-smash';
+import { mountLeaderboard, formatDuration } from './leaderboard.mjs?v=2026-10-11-lob-smash';
+import { OnlineSession, ONLINE, generateCode, normalizeCode } from './online.mjs?v=2026-10-11-lob-smash';
 import { COUNTDOWN_DURATION_MS, EFFECT_SOUND_NAMES, MUSIC_SOUND_NAMES, contactSoundName, countdownLabel, createSoundEffects, matchSoundName, pointSoundName, soundVolume } from './audio.mjs?v=2026-09-14-laptop-sounds';
+import { GAMEPLAY, gameplayConfig, readGameplay, requireGameplay, saveGameplay } from './gameplay.mjs';
 
 async function mount() {
   const canvas = document.getElementById('court');
   const render = await createRenderer(canvas);
-  const state = createState();
+  let gameplay = readGameplay();
+  const state = createState({ variant: gameplay });
   let difficulty = readDifficulty();
   let computer = createComputer({ difficulty });
   const startButton = document.getElementById('start-button');
@@ -200,6 +202,16 @@ async function mount() {
     return now - localCountdown.startedAt;
   }
   const simulation = createClock(() => step(state, input.read(), local ? input.readOpponent() : computer.read(state), local ? null : computer.stroke));
+  function clearPendingLobs() {
+    if (!state.pendingLob.some(Boolean)) return;
+    state.pendingLob.fill(false);
+    updateLobIndicators();
+  }
+  function toggleLob(side) {
+    if (online || localCountdown || menu.open || state.variant !== GAMEPLAY.lobSmash.id || state.phase !== 'rally') return;
+    state.pendingLob[side] = !state.pendingLob[side];
+    updateLobIndicators();
+  }
   function toggle() {
     if (menu.open || onlineSetup || !document.getElementById('leaderboard').hidden) return;
     if (online) { input.clear(); if (['playing', 'countdown'].includes(online.stage)) online.requestPause(); else online.requestReady(); return; }
@@ -210,7 +222,7 @@ async function mount() {
     else if (state.phase !== 'over') start(state);
     input.clear(); simulation.reset(); update(); render(state); schedule();
   }
-  input = createInput(canvas, null, () => state.teams[1], toggle);
+  input = createInput(canvas, null, () => state.teams[1], toggle, toggleLob, clearPendingLobs);
   function arrangeControls() {
     localButton.disabled = mobileControls.matches;
     localButton.title = mobileControls.matches ? 'Nur mit Tastatur verfügbar' : '';
@@ -260,7 +272,10 @@ async function mount() {
     if (!online && status.textContent !== message) status.textContent = message;
     showPower(power, powerLabel, state.teams[1].power);
     if (local) showPower(opponentPower, document.getElementById('opponent-power-label'), state.teams[0].power);
+    updateLobIndicators();
+    document.getElementById('start-gameplay').hidden = !!online || !!localCountdown || state.phase !== 'ready';
     document.getElementById('start-difficulty').hidden = !!online || local || !!localCountdown || state.phase !== 'ready';
+    syncGameplay();
     updateOverlayChoices();
     overlay.classList.toggle('game-over-actions', !online && state.phase === 'over');
     countdownDisplay.hidden = !localCountdown && online?.stage !== 'countdown';
@@ -291,7 +306,7 @@ async function mount() {
     pauseButton.textContent = state.phase === 'paused' ? 'Weiter' : 'Pause';
     if (state.phase === 'over') {
       overlayTitle.textContent = local ? (state.winner === 1 ? 'Pfeiltasten gewinnen!' : 'WASD gewinnt!') : state.winner === 1 ? 'Gewonnen!' : 'Revanche?';
-      overlayText.textContent = `${state.score[1]} : ${state.score[0]} · Spielzeit ${formatDuration(Math.round(state.time * 1000))}`;
+      overlayText.textContent = `${state.score[1]} : ${state.score[0]} · Spielzeit ${formatDuration(Math.round(state.time * 1000))} · ${gameplayConfig(state.variant).label}`;
       startButton.textContent = 'Noch eine Partie';
       startButton.focus({ preventScroll: true });
       if (!local) {
@@ -299,7 +314,7 @@ async function mount() {
         leaderboard.finish(state, roundId, difficulty);
       }
     } else if (state.phase === 'paused') {
-      overlayTitle.textContent = 'Pause'; overlayText.textContent = local ? 'Gemeinsame Pause. Weiter mit Leertaste / P oder dem Button.' : 'Kurz durchatmen. Dein Spiel wartet.';
+      overlayTitle.textContent = 'Pause'; overlayText.textContent = `Variante ${gameplayConfig(state.variant).label} · ${local ? 'Gemeinsame Pause. Weiter mit Leertaste / P oder dem Button.' : 'Kurz durchatmen. Dein Spiel wartet.'}`;
       startButton.textContent = 'Weiterspielen';
     } else if (state.phase === 'ready') {
       overlayTitle.textContent = local ? 'Zu zweit bereit?' : 'Bereit?'; overlayText.textContent = local ? 'Gelb unten: Pfeiltasten. Korall oben: WASD. Ihr trefft automatisch.' : 'Dein Doppel ist gelb. Triff den Ball automatisch.';
@@ -322,7 +337,7 @@ async function mount() {
       }
     } else if (previous !== null) {
       if (online) online.advance((now - previous) / 1000);
-      else simulation.advance((now - previous) / 1000);
+      else simulation.advance((now - previous) / 1000 * gameplayConfig(state.variant).simulationRate);
     }
     if (online) Object.assign(state, online.view());
     previous = now;
@@ -460,7 +475,7 @@ async function mount() {
     } catch (error) { document.getElementById('join-message').textContent = error.message; }
   }
   function setLocalMode(enabled) {
-    local = enabled; input.setLocalMultiplayer(enabled);
+    local = enabled; state.pendingLob.fill(false); input.setLocalMultiplayer(enabled);
     document.body.classList.toggle('local-duel', enabled);
     document.getElementById('human-label').textContent = enabled ? 'PFEILE' : 'DU';
     document.getElementById('opponent-label').textContent = enabled ? 'WASD' : 'CPU';
@@ -478,6 +493,32 @@ async function mount() {
     roundId = crypto.randomUUID(); displayedPhase = ''; simulation.reset();
     resetSoundTracking(); update(); render(state); startButton.focus({ preventScroll: true });
   }
+  function updateLobIndicators() {
+    const active = state.variant === GAMEPLAY.lobSmash.id && !online && ['rally', 'paused'].includes(state.phase);
+    const human = document.getElementById('lob-status-human');
+    const opponent = document.getElementById('lob-status-opponent');
+    human.hidden = !active || !state.pendingLob[1];
+    human.textContent = local ? 'PFEILE · LOB BEREIT' : 'LOB BEREIT';
+    opponent.hidden = !active || !local || !state.pendingLob[0];
+  }
+  function syncGameplay() {
+    const special = gameplay === GAMEPLAY.lobSmash.id;
+    for (const button of document.querySelectorAll('[data-start-gameplay]')) {
+      const selected = button.dataset.startGameplay === gameplay;
+      button.setAttribute('aria-pressed', String(selected));
+      button.classList.toggle('active', selected);
+    }
+    onlineButton.disabled = special;
+    onlineButton.title = special ? 'Online nur mit Standard' : '';
+    document.getElementById('online-standard-only').hidden = !special;
+    for (const element of document.querySelectorAll('.lob-help')) element.hidden = !special;
+  }
+  function selectGameplay(value) {
+    if (online || state.phase !== 'ready') return;
+    gameplay = requireGameplay(value); saveGameplay(gameplay);
+    state.variant = gameplay; state.pendingLob.fill(false); state.lastShot = 'feed'; state.ball.shotType = 'feed';
+    syncGameplay(); updateLobIndicators(); update(); render(state);
+  }
   function syncDifficulty() {
     for (const button of document.querySelectorAll('[data-start-difficulty]')) {
       const selected = button.dataset.startDifficulty === difficulty;
@@ -494,6 +535,8 @@ async function mount() {
     if (!online && !local && state.phase === 'ready') selectDifficulty(button.dataset.startDifficulty);
   });
   syncDifficulty();
+  for (const button of document.querySelectorAll('[data-start-gameplay]')) button.addEventListener('click', () => selectGameplay(button.dataset.startGameplay));
+  syncGameplay();
   localButton.addEventListener('click', () => chooseLocalMode(true));
   localBackButton.addEventListener('click', () => chooseLocalMode(false));
   onlineButton.addEventListener('click', showOnlineSetup);
@@ -510,7 +553,7 @@ async function mount() {
     catch { status.textContent = `Raumcode: ${online.code}`; }
   });
   startButton.disabled = false; resetButton.disabled = false; menuButton.disabled = false;
-  onlineButton.disabled = false; localButton.disabled = mobileControls.matches;
+  onlineButton.disabled = gameplay === GAMEPLAY.lobSmash.id; localButton.disabled = mobileControls.matches;
   update(); render(state);
 }
 mount().catch(error => {

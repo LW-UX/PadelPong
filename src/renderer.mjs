@@ -1,4 +1,4 @@
-import { C, predictLanding } from './physics.mjs?v=2026-09-13-audio-events';
+import { C, predictLanding } from './physics.mjs?v=2026-10-11-lob-smash';
 
 export async function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -51,7 +51,7 @@ export async function createRenderer(canvas) {
     rect(x - size / 2, y - size / 2, 2, 2, '#ffffc8');
     if (b.z > C.reach && state.phase === 'rally') {
       ctx.font = '8px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff8d5';
-      ctx.fillText('HOCH', x, y - 9);
+      ctx.fillText(b.shotType === 'lob' ? 'LOB' : b.shotType === 'smash' ? 'SMASH' : 'HOCH', x, y - 9);
     }
   };
 }

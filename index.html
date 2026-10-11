@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07080C">
   <title>PadelPong</title>
   <link rel="icon" href="assets/images/favicon.ico" sizes="any">
-  <link rel="stylesheet" href="assets/styles/pong.css?v=2026-10-11-standalone">
+  <link rel="stylesheet" href="assets/styles/pong.css?v=2026-10-11-lob-smash">
 </head>
 <body>
   <div class="pong-shell">
@@ -19,9 +19,9 @@
         <p class="hero-eyebrow eyebrow">01 / STEUERUNG</p>
         <h2 class="sh-title">Zwei Balken.<br>Ein Team.</h2>
         <div class="key-grid" aria-hidden="true"><span>↑</span><span>←</span><span>↓</span><span>→</span></div>
-        <p class="sh-meta desktop-instruction solo-controls">Pfeiltasten oder WASD.<br>Mit der Maus im Feld ziehen.</p>
-        <p class="sh-meta touch-instruction solo-controls">Zum Bewegen direkt im Spielfeld ziehen. Du spielst unten in Gelb und triffst automatisch.</p>
-        <p id="local-instruction" class="sh-meta" hidden><strong>Gelb unten: Pfeiltasten.</strong><br><strong>Korall oben: WASD.</strong><br>W bewegt nach oben, S nach unten. Leertaste / P pausiert für beide.</p>
+        <p class="sh-meta desktop-instruction solo-controls">Pfeiltasten oder WASD.<br>Mit der Maus im Feld ziehen.<span class="lob-help" hidden><br>Shift merkt den nächsten Lob vor.</span></p>
+        <p class="sh-meta touch-instruction solo-controls">Zum Bewegen direkt im Spielfeld ziehen. Du spielst unten in Gelb und triffst automatisch.<span class="lob-help" hidden> Ein zusätzlicher Finger-Tipp merkt den nächsten Lob vor.</span></p>
+        <p id="local-instruction" class="sh-meta" hidden><strong>Gelb unten: Pfeiltasten.</strong><br><strong>Korall oben: WASD.</strong><br>W bewegt nach oben, S nach unten. Leertaste / P pausiert für beide.<span class="lob-help" hidden><br>Rechte Shift-Taste: Gelb-Lob. Linke Shift-Taste: Korall-Lob.</span></p>
         <p class="sh-meta">Beide Balken bewegen sich identisch. Jeder bleibt in seinem Bereich.</p>
         <p class="sh-meta note"><span aria-hidden="true">↗</span> Zum Netz laufen gibt Druck; rückwärts laufen spielt kürzer. Zu hart trifft die gegnerische Wand, zu weich kann ins Netz gehen.</p>
         <p class="widget-label micro desktop-instruction">LEERTASTE / P = PAUSE</p>
@@ -36,12 +36,15 @@
         </div>
         <div class="court-wrap">
           <canvas id="court" width="272" height="496" tabindex="0" aria-label="PadelPong. Du spielst unten mit den gelben Balken. Bewegen mit Pfeiltasten oder WASD." aria-describedby="rules-text">Zum Spielen wird ein Browser mit Canvas-Unterstützung benötigt.</canvas>
+          <div id="lob-status-human" class="lob-status lob-status-human" role="status" hidden>LOB BEREIT</div>
+          <div id="lob-status-opponent" class="lob-status lob-status-opponent" role="status" hidden>WASD · LOB BEREIT</div>
           <div class="countdown-display" id="countdown-display" role="status" aria-live="assertive" hidden></div>
           <div class="game-overlay" id="game-overlay">
             <p class="hero-eyebrow eyebrow" id="overlay-label">EINE KURZE PADELPAUSE</p>
             <h2 class="sh-title" id="overlay-title">Bereit?</h2>
             <div id="primary-overlay-content" class="overlay-content">
               <p id="overlay-text">Dein Doppel ist gelb.<br>Triff den Ball automatisch.</p>
+              <fieldset id="start-gameplay" class="difficulty-choice"><legend>Spielvariante</legend><div class="match-scope-toggle"><button class="active" type="button" data-start-gameplay="standard" aria-pressed="true">Standard</button><button type="button" data-start-gameplay="lob-smash-v1" aria-pressed="false">Lob/Smash</button></div></fieldset>
               <fieldset id="start-difficulty" class="difficulty-choice"><legend>Schwierigkeit</legend><div class="match-scope-toggle"><button class="active" type="button" data-start-difficulty="easy" aria-pressed="true">Leicht</button><button type="button" data-start-difficulty="hard" aria-pressed="false">Schwer</button></div></fieldset>
               <button id="start-button" class="primary-button" type="button" disabled>Spiel lädt …</button>
             </div>
@@ -49,6 +52,7 @@
             <div id="multiplayer-options" class="overlay-actions">
               <button id="local-open" class="primary-button" type="button" disabled>1v1 Laptop</button>
               <button id="online-open" class="primary-button" type="button" disabled>1v1 Online</button>
+              <p id="online-standard-only" class="sh-meta" hidden>Online nur mit Standard</p>
             </div>
             <div id="online-setup" class="online-setup" hidden>
               <p class="sh-meta online-explanation">Eine Person erstellt das Spiel. Die andere tritt mit dem Raumcode bei.</p>
@@ -84,6 +88,7 @@
         <div class="height-demo" aria-hidden="true"><span></span><i></i><b></b></div>
         <p class="sh-meta">Der Schatten zeigt die Position am Boden. Hohe Bälle fliegen über die Balken.</p>
         <p class="sh-meta">Das kleine Quadrat zeigt den nächsten Aufprall. Orange warnt vor einem direkten Wand- oder Zaunfehler.</p>
+        <p class="sh-meta lob-help" hidden>Ein Lob steigt hoch und tief ins gegnerische Feld. Stehst du passend am Netz, wird ein fallender gegnerischer Lob automatisch zum Smash.</p>
       </aside>
     </main>
 
@@ -168,6 +173,6 @@
   <audio id="effect-victory" src="assets/audio/victory.mp3" preload="auto"></audio>
   <noscript><p>Bitte JavaScript aktivieren, um PadelPong zu spielen.</p></noscript>
   <script src="src/supabase-config.js"></script>
-  <script type="module" src="src/main.mjs?v=2026-10-11-standalone"></script>
+  <script type="module" src="src/main.mjs?v=2026-10-11-lob-smash"></script>
 </body>
 </html>

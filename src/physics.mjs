@@ -1,4 +1,5 @@
 import { RULESET } from './ruleset.mjs?v=2026-09-12-rules-v2';
+import { GAMEPLAY, requireGameplay } from './gameplay.mjs';
 
 // Court coordinates: metres, origin at the computer's back-left corner.
 // z is height above the floor. Rendering never changes collision coordinates.
@@ -7,7 +8,8 @@ export const C = Object.freeze({
   radius: 0.12, paddleWidth: 1.4, paddleDepth: 0.28, reach: 1.65,
   maxOffset: 1.8, speed: 5.2, acceleration: 78, step: 1 / 60,
   bounce: 0.76, wallBounce: 0.80, fenceBounce: 0.86, glassLength: 4,
-  shortReduction: 0.40, targetScore: 7
+  shortReduction: 0.40, targetScore: 7, lobApex: 4.5, smashReach: 2.8,
+  smashNetDistance: 4, lobBackWallDistance: 2, smashLandingDepth: 5
 });
 export const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const EPS = 1e-8;
@@ -27,18 +29,20 @@ export const heightAt = (b, t) => b.z + b.vz * t - C.gravity * t * t / 2;
 export function groundTime(b) {
   return (b.vz + Math.sqrt(Math.max(0, b.vz * b.vz + 2 * C.gravity * b.z))) / C.gravity;
 }
-export function createState() {
+export function createState({ variant = GAMEPLAY.standard.id } = {}) {
   return {
-    ruleset: RULESET, phase: 'ready', resumePhase: 'rally', score: [0, 0], time: 0,
+    ruleset: RULESET, variant: requireGameplay(variant), phase: 'ready', resumePhase: 'rally', score: [0, 0], time: 0,
     teams: [0, 1].map(side => ({ side, offset: 0, y: side ? 17 : 3, vx: 0, vy: 0, power: 0 })),
-    ball: { x: 2.5, y: 17, z: 0.8, vx: 0, vy: 0, vz: 0, lastHit: 1, bounces: 0, feed: true, contactSide: null },
+    ball: { x: 2.5, y: 17, z: 0.8, vx: 0, vy: 0, vz: 0, lastHit: 1, bounces: 0, feed: true, contactSide: null, shotType: 'feed' },
+    pendingLob: [false, false], lastShot: 'feed',
     message: 'Bereit für eine kurze Partie?', rallyHits: 0, bestRally: 0,
     pointTimer: 0, effects: [], effectSequence: 0, pointContactEffectId: null, winner: null
   };
 }
-export function reset(state) { Object.assign(state, createState()); }
+export function reset(state, { variant = state.variant ?? GAMEPLAY.standard.id } = {}) { Object.assign(state, createState({ variant })); }
 export function pause(state) {
   if (state.phase === 'rally' || state.phase === 'point') {
+    state.pendingLob?.fill(false);
     state.resumePhase = state.phase;
     state.phase = 'paused';
   }
@@ -52,7 +56,7 @@ export function feed(state) {
   const server = total % 2 ? 0 : 1;
   state.teams.forEach(t => Object.assign(t, { offset: 0, y: t.side ? 17 : 3, vx: 0, vy: 0, power: 0 }));
   const x = total % 4 < 2 ? 2.5 : 7.5;
-  Object.assign(state.ball, { x, y: server ? 17 : 3, z: 0.8, lastHit: server, bounces: 0, feed: true, contactSide: null });
+  Object.assign(state.ball, { x, y: server ? 17 : 3, z: 0.8, lastHit: server, bounces: 0, feed: true, contactSide: null, shotType: 'feed' });
   // Safe diagonal opening ball; it is intentionally not an official serve.
   const t = 1.6;
   const targetX = x < C.width / 2 ? C.width - 2 : 2;
@@ -60,6 +64,8 @@ export function feed(state) {
   state.ball.vy = (server ? -13 : 13) / t;
   state.ball.vz = (C.gravity * t * t / 2 - state.ball.z) / t;
   state.rallyHits = 0;
+  state.pendingLob.fill(false);
+  state.lastShot = 'feed';
   state.pointContactEffectId = null;
   state.phase = 'rally';
   state.message = 'Anspiel · erst aufspringen lassen';
@@ -67,6 +73,7 @@ export function feed(state) {
 export function awardPoint(state, winner, reason, pointContactEffectId = null) {
   if (state.phase !== 'rally') return;
   state.score[winner]++;
+  state.pendingLob.fill(false);
   state.winner = winner;
   state.pointContactEffectId = pointContactEffectId;
   state.message = `${winner ? 'Dein Punkt' : 'Punkt Computer'} · ${reason}`;
@@ -97,7 +104,7 @@ export function moveTeam(team, input, dt) {
   const forward = clamp(team.vy * (team.side ? -1 : 1) / C.speed, -1, 1);
   team.power += (forward - team.power) * (1 - Math.exp(-dt / 0.10));
 }
-export function hitBall(state, side, paddleX, team = state.teams[side], computerStroke = null) {
+export function hitBall(state, side, paddleX, team = state.teams[side], computerStroke = null, requestedShot = null) {
   const b = state.ball;
   emitEffect(state, 'hit');
   if (!b.feed && b.lastHit === side) {
@@ -112,52 +119,77 @@ export function hitBall(state, side, paddleX, team = state.teams[side], computer
   const variation = side === 0 && !b.feed && typeof computerStroke === 'function'
     ? computerStroke({ offset, team, time: state.time }) : null;
   if (variation) offset = clamp(offset + variation.offset, -1, 1);
+  const special = state.variant === GAMEPLAY.lobSmash.id;
+  const shotType = special && state.pendingLob[side] ? 'lob' : special && requestedShot === 'smash' ? 'smash' : 'normal';
+  state.pendingLob[side] = false;
   const power = clamp(team.power, 0, 1);
   const soft = 1 + C.shortReduction * clamp(team.power, -1, 0);
-  // At full forward speed the predicted first bounce is beyond the back wall.
-  // The resulting flight is simulated until a collision decides the point.
-  const wallDistance = side ? b.y - C.radius : C.length - C.radius - b.y;
-  const travel = distance + (wallDistance + 2.4 - distance) * power * power;
-  // Neutral and hard strokes retain their original arc. Backward movement
-  // slows horizontal travel only, so a soft stroke can genuinely hit the net.
-  const netFraction = clamp(Math.abs(C.net - b.y) / travel, 0.02, 0.98);
-  const needed = C.netHeight + 0.22 - b.z * (1 - netFraction);
-  const duration = Math.max(1.05, Math.sqrt(Math.max(0, 2 * needed / (C.gravity * netFraction * (1 - netFraction)))));
-  b.vy = direction * travel / duration;
-  b.vx = Math.abs(b.vy) * offset * 0.32;
-  // Preserve the normal contact-angle range. Pressure adds continuous scatter,
-  // never a wall target; most contacts get only a small change in length.
-  if (variation) {
-    b.vx *= variation.length;
-    b.vy *= variation.length;
+  if (shotType === 'lob') {
+    const targetY = side ? C.lobBackWallDistance : C.length - C.lobBackWallDistance;
+    b.vz = Math.sqrt(Math.max(0, 2 * C.gravity * (C.lobApex - b.z)));
+    const duration = groundTime(b);
+    b.vy = (targetY - b.y) / duration;
+    b.vx = Math.abs(b.vy) * offset * 0.32;
+  } else if (shotType === 'smash') {
+    const targetY = side ? C.net - C.smashLandingDepth : C.net + C.smashLandingDepth;
+    const distance = Math.abs(targetY - b.y);
+    const duration = Math.max(0.45, distance / 16);
+    b.vy = (targetY - b.y) / duration;
+    b.vx = Math.abs(b.vy) * offset * 0.32;
+    b.vz = (C.gravity * duration * duration / 2 - b.z) / duration;
+  } else {
+    // At full forward speed the predicted first bounce is beyond the back wall.
+    // The resulting flight is simulated until a collision decides the point.
+    const wallDistance = side ? b.y - C.radius : C.length - C.radius - b.y;
+    const travel = distance + (wallDistance + 2.4 - distance) * power * power;
+    // Neutral and hard strokes retain their original arc. Backward movement
+    // slows horizontal travel only, so a soft stroke can genuinely hit the net.
+    const netFraction = clamp(Math.abs(C.net - b.y) / travel, 0.02, 0.98);
+    const needed = C.netHeight + 0.22 - b.z * (1 - netFraction);
+    const duration = Math.max(1.05, Math.sqrt(Math.max(0, 2 * needed / (C.gravity * netFraction * (1 - netFraction)))));
+    b.vy = direction * travel / duration;
+    b.vx = Math.abs(b.vy) * offset * 0.32;
+    // Preserve the normal contact-angle range. Pressure adds continuous scatter,
+    // never a wall target; most contacts get only a small change in length.
+    if (variation) {
+      b.vx *= variation.length;
+      b.vy *= variation.length;
+    }
+    b.vx *= soft;
+    b.vy *= soft;
+    b.vz = (C.gravity * duration * duration / 2 - b.z) / duration;
   }
-  b.vx *= soft;
-  b.vy *= soft;
-  b.vz = (C.gravity * duration * duration / 2 - b.z) / duration;
   b.lastHit = side;
   b.bounces = 0;
   b.feed = false;
+  b.shotType = shotType;
+  state.lastShot = shotType;
   state.rallyHits++;
   state.bestRally = Math.max(state.bestRally, state.rallyHits);
-  state.message = power > 0.85 ? 'Viel Druck · Achtung, Wand!' : soft < 0.94 ? 'Kurz gespielt · Achtung, Netz!' : 'Ballwechsel';
+  state.message = shotType === 'lob' ? 'Lob!' : shotType === 'smash' ? 'Smash!' : power > 0.85 ? 'Viel Druck · Achtung, Wand!' : soft < 0.94 ? 'Kurz gespielt · Achtung, Netz!' : 'Ballwechsel';
 }
 function axisInterval(position, velocity, half) {
   if (Math.abs(velocity) < EPS) return Math.abs(position) <= half ? [-Infinity, Infinity] : null;
   const a = (-half - position) / velocity, b = (half - position) / velocity;
   return [Math.min(a, b), Math.max(a, b)];
 }
-function paddleTime(b, paddle, remaining) {
+function paddleTime(b, paddle, remaining, reach = C.reach) {
   const xi = axisInterval(b.x - paddle.x, b.vx - paddle.vx, C.paddleWidth / 2 + C.radius);
   const yi = axisInterval(b.y - paddle.y, b.vy - paddle.vy, C.paddleDepth / 2 + C.radius);
   if (!xi || !yi) return null;
   const entry = Math.max(0, xi[0], yi[0]), leave = Math.min(remaining, xi[1], yi[1]);
   if (entry > leave + EPS) return null;
-  if (heightAt(b, entry) >= -EPS && heightAt(b, entry) <= C.reach + EPS) return entry;
+  if (heightAt(b, entry) >= -EPS && heightAt(b, entry) <= reach + EPS) return entry;
   // A ball may descend into reach while still overlapping the moving paddle.
-  const disc = b.vz * b.vz + 2 * C.gravity * (b.z - C.reach);
+  const disc = b.vz * b.vz + 2 * C.gravity * (b.z - reach);
   if (disc < 0) return null;
   const descend = (b.vz + Math.sqrt(disc)) / C.gravity;
   return descend >= entry && descend <= leave ? descend : null;
+}
+function smashAvailable(state, side) {
+  const team = state.teams[side], b = state.ball;
+  return state.variant === GAMEPLAY.lobSmash.id && b.shotType === 'lob' && b.bounces === 0
+    && !state.pendingLob[side] && Math.abs(team.y - C.net) <= C.smashNetDistance;
 }
 function advance(b, t) {
   b.x += b.vx * t; b.y += b.vy * t;
@@ -192,8 +224,13 @@ export function simulateBall(state, dt, origins = state.teams.map(t => ({ ...t }
       const team = state.teams[side], origin = origins[side];
       for (const base of [2.5, 7.5]) {
         const paddle = { x: base + origin.offset + team.vx * elapsed, y: origin.y + team.vy * elapsed, vx: team.vx, vy: team.vy };
-        const t = paddleTime(b, paddle, remaining);
-        if (t !== null) add(t, 'paddle', 3, { side, x: paddle.x + team.vx * t });
+        const canSmash = smashAvailable(state, side);
+        const t = paddleTime(b, paddle, remaining, canSmash ? C.smashReach : C.reach);
+        if (t !== null) {
+          const z = heightAt(b, t), falling = b.vz - C.gravity * t < 0;
+          const shotType = canSmash && falling && z > C.reach + EPS ? 'smash' : null;
+          if (z <= C.reach + EPS || shotType) add(t, 'paddle', 3, { side, x: paddle.x + team.vx * t, shotType });
+        }
       }
     }
     events.sort((a, c) => Math.abs(a.time - c.time) < EPS ? a.priority - c.priority : a.time - c.time);
@@ -222,7 +259,7 @@ export function simulateBall(state, dt, origins = state.teams.map(t => ({ ...t }
         awardPoint(state, returned ? b.lastHit : 1 - b.lastHit, returned ? 'Nach Aufsprung zurück ins Netz' : 'Im Netz');
       }
     } else {
-      hitBall(state, event.side, event.x, state.teams[event.side], event.side === 0 ? computerStroke : null);
+      hitBall(state, event.side, event.x, state.teams[event.side], event.side === 0 ? computerStroke : null, event.shotType);
     }
   }
 }

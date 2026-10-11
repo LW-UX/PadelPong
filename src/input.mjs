@@ -1,6 +1,6 @@
-import { C, clamp } from './physics.mjs?v=2026-09-12-rules-v2';
+import { C, clamp } from './physics.mjs?v=2026-10-11-lob-smash';
 
-export function createInput(canvas, joystick, getTeam, onToggle) {
+export function createInput(canvas, joystick, getTeam, onToggle, onLob = () => {}, onInterrupted = () => {}) {
   const abort = new AbortController(), options = { signal: abort.signal };
   const keys = new Set();
   let localMultiplayer = false;
@@ -15,13 +15,17 @@ export function createInput(canvas, joystick, getTeam, onToggle) {
     if (e.target.closest('button, a, select, input, summary')) return;
     if (movementKeys.has(e.code)) { e.preventDefault(); keys.add(e.code); target = null; }
     if ((e.code === 'Space' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); onToggle(); }
+    if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) {
+      e.preventDefault();
+      onLob(localMultiplayer ? (e.code === 'ShiftLeft' ? 0 : 1) : 1);
+    }
   }, options);
   window.addEventListener('keyup', e => keys.delete(e.code), options);
   window.addEventListener('blur', clear, options);
   canvas.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     if (localMultiplayer) { e.preventDefault(); canvas.focus({ preventScroll: true }); return; }
-    if (drag) return;
+    if (drag) { e.preventDefault(); onLob(1); return; }
     e.preventDefault(); canvas.focus({ preventScroll: true }); canvas.setPointerCapture(e.pointerId);
     const team = getTeam();
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, offset: team.offset, depth: team.y };
@@ -37,7 +41,12 @@ export function createInput(canvas, joystick, getTeam, onToggle) {
     };
   }, options);
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    canvas.addEventListener(event, e => { if (e.pointerId === drag?.id) { drag = null; target = null; } }, options);
+    canvas.addEventListener(event, e => {
+      if (e.pointerId === drag?.id) {
+        drag = null; target = null;
+        if (event === 'pointercancel') onInterrupted();
+      }
+    }, options);
   }
   function updateStick(e) {
     const rect = joystick.getBoundingClientRect(), radius = rect.width * 0.32;

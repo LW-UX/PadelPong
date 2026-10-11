@@ -17,10 +17,11 @@ async function inputHarness(width = 272, height = 496, withJoystick = true) {
     querySelector: () => knob, setPointerCapture() {},
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 })
   });
-  let toggles = 0;
+  let toggles = 0, interruptions = 0;
+  const lobs = [];
   const { createInput } = await import('../src/input.mjs');
-  const input = createInput(canvas, withJoystick ? joystick : null, () => ({ offset: 0, y: 17 }), () => toggles++);
-  return { input, canvas, joystick, win, toggles: () => toggles, close() { input.destroy(); global.window = previousWindow; } };
+  const input = createInput(canvas, withJoystick ? joystick : null, () => ({ offset: 0, y: 17 }), () => toggles++, side => lobs.push(side), () => interruptions++);
+  return { input, canvas, joystick, win, lobs, interruptions: () => interruptions, toggles: () => toggles, close() { input.destroy(); global.window = previousWindow; } };
 }
 test('mouse dragging accounts for fitted court scale and releases cleanly', async () => {
   for (const [width, height, delta] of [[272, 496, 4.48], [544, 992, 8.96], [544, 496, 4.48]]) {
@@ -115,5 +116,34 @@ test('local duel ignores mouse and touch and mode changes clear held keys withou
     event(h.win, 'keydown', { code: 'KeyW' }); event(h.win, 'keydown', { code: 'ArrowRight' });
     assert.deepEqual(h.input.read(), { x: 1, y: -1 });
     assert.deepEqual(h.input.readOpponent(), { x: 0, y: 0 });
+  } finally { h.close(); }
+});
+
+test('shift queues one lob for the correct solo or laptop team without key-repeat', async () => {
+  const h = await inputHarness();
+  try {
+    event(h.win, 'keydown', { code: 'ShiftLeft', repeat: false });
+    event(h.win, 'keydown', { code: 'ShiftLeft', repeat: true });
+    event(h.win, 'keydown', { code: 'ShiftRight', repeat: false });
+    assert.deepEqual(h.lobs, [1, 1]);
+    h.input.setLocalMultiplayer(true);
+    event(h.win, 'keydown', { code: 'ShiftLeft', repeat: false });
+    event(h.win, 'keydown', { code: 'ShiftRight', repeat: false });
+    assert.deepEqual(h.lobs, [1, 1, 0, 1]);
+  } finally { h.close(); }
+});
+
+test('a second court pointer queues a lob without taking over movement and cancelled control interrupts it', async () => {
+  const h = await inputHarness(272, 496, false);
+  try {
+    event(h.canvas, 'pointerdown', { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
+    event(h.canvas, 'pointermove', { pointerId: 1, clientX: 4.48, clientY: -4.48 });
+    const movement = h.input.read();
+    event(h.canvas, 'pointerdown', { pointerId: 2, button: 0, clientX: 100, clientY: 100 });
+    assert.deepEqual(h.lobs, [1]);
+    assert.deepEqual(h.input.read(), movement);
+    event(h.canvas, 'pointercancel', { pointerId: 1 });
+    assert.equal(h.interruptions(), 1);
+    assert.deepEqual(h.input.read(), { x: 0, y: 0 });
   } finally { h.close(); }
 });

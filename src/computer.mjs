@@ -1,12 +1,13 @@
-import { C, clamp, predictLanding } from './physics.mjs?v=2026-09-13-easy-balanced';
+import { C, clamp, predictLanding } from './physics.mjs?v=2026-10-11-lob-smash';
 import { COMPUTER_PROFILES } from './difficulty.mjs?v=2026-09-13-easy-balanced';
+import { GAMEPLAY } from './gameplay.mjs';
 
 export function createComputer({ difficulty = 'hard', random = Math.random } = {}) {
   if (!Object.hasOwn(COMPUTER_PROFILES, difficulty)) throw new Error('Ungültige Schwierigkeitsstufe.');
   const profile = COMPUTER_PROFILES[difficulty];
   const assisted = difficulty !== 'hard';
   let nextDecision = 0, target = { offset: 0, y: 3.2 };
-  let incomingShot = null, aimError = 0, reactAt = 0, lastTurn = -Infinity, previousX = 0;
+  let incomingShot = null, lobDecisionShot = null, aimError = 0, reactAt = 0, lastTurn = -Infinity, previousX = 0;
   const noise = () => { const n = random() + random() - 1; return n * Math.abs(n); };
   return {
     // Evaluated at the actual contact, not when the opponent hits the ball.
@@ -22,15 +23,21 @@ export function createComputer({ difficulty = 'hard', random = Math.random } = {
       };
     } : null,
     reset() {
-      nextDecision = 0; target = { offset: 0, y: 3.2 }; incomingShot = null;
+      nextDecision = 0; target = { offset: 0, y: 3.2 }; incomingShot = null; lobDecisionShot = null;
       aimError = 0; reactAt = 0; lastTurn = -Infinity; previousX = 0;
     },
     read(state) {
       const team = state.teams[0], b = state.ball;
+      const humanShot = b.lastHit === 1 && !b.feed ? `${state.score[0]}:${state.score[1]}:${state.rallyHits}` : null;
+      if (state.variant === GAMEPLAY.lobSmash.id && humanShot !== lobDecisionShot) {
+        lobDecisionShot = humanShot;
+        state.pendingLob[0] = humanShot !== null && state.teams[1].y - C.net <= 3
+          && random() < (difficulty === 'easy' ? 0.35 : 0.60);
+      } else if (state.variant !== GAMEPLAY.lobSmash.id) state.pendingLob[0] = false;
       if (assisted && state.phase === 'rally') {
         // Sample once per human return, independently of rendering or decision rate.
         // Include the score because rallyHits starts over at each point.
-        const shot = b.lastHit === 1 && !b.feed ? `${state.score[0]}:${state.score[1]}:${state.rallyHits}` : null;
+        const shot = humanShot;
         if (shot !== incomingShot) {
           incomingShot = shot;
           aimError = 0;
