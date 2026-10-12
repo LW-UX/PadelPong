@@ -60,7 +60,7 @@ Diese Datei ist die kanonische Quelle für das saisonunabhängige Spiel PadelPon
 
 ## 1v1 Online
 
-- Online verwendet ausschließlich „Standard“. Bei ausgewähltem „Lob/Smash“ ist der Online-Einstieg mit entsprechendem Hinweis deaktiviert; Protokoll und Datenbank werden für diese Variante nicht erweitert.
+- Online verwendet ausschließlich „Standard“. Bei ausgewähltem „Lob/Smash“ ist der Online-Einstieg ohne zusätzlichen Hinweistext deaktiviert; Protokoll und Datenbank werden für diese Variante nicht erweitert.
 - Zwei Personen spielen auf eigenen Geräten ohne Anmeldung über einen kurzlebigen Raumcode. Ein Raum besitzt genau zwei Plätze und keine öffentliche Raumliste.
 - Beide sehen das eigene Team unten. Der Host berechnet verbindlich Physik, Treffer, Zeit und Punkte; der Gast überträgt Eingaben und gleicht seine Darstellung ab.
 - Der Modus ist eine Freizeitpartie ohne verifizierte Identität, serverseitigen Manipulationsschutz, persistente Ergebnisse oder Einfluss auf die Computer-Bestenliste.

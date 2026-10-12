@@ -510,7 +510,6 @@ async function mount() {
     }
     onlineButton.disabled = special;
     onlineButton.title = special ? 'Online nur mit Standard' : '';
-    document.getElementById('online-standard-only').hidden = !special;
     for (const element of document.querySelectorAll('.lob-help')) element.hidden = !special;
   }
   function selectGameplay(value) {

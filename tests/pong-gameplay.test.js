@@ -132,8 +132,10 @@ test('Lob/Smash wins never create leaderboard entries and online remains Standar
 
 test('the start menu names the variant Lob/Smash and explains its local controls', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '../src/main.mjs'), 'utf8');
   assert.match(html, /data-start-gameplay="lob-smash-v1"[^>]*>Lob\/Smash</);
-  assert.match(html, /Online nur mit Standard/);
+  assert.match(main, /onlineButton\.disabled = special/);
+  assert.doesNotMatch(html, /Online nur mit Standard/);
   assert.match(html, /Shift merkt den nächsten Lob vor/);
   assert.doesNotMatch(html, />Experiment</);
 });
