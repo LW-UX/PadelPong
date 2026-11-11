@@ -40,7 +40,14 @@ Diese Datei ist die kanonische Quelle für das saisonunabhängige Spiel PadelPon
 - Musik und Effekte besitzen getrennte gespeicherte Schalter. Musik läuft nur während aktivem Spiel; Menüs, Pause, Countdown und Ergebnisansicht bleiben musikfrei.
 - Audio wird über einen langlebigen Mixer vorgeladen und mit der ersten Nutzerinteraktion aktiviert. Mobile und Desktop-Wiedergabe dürfen getrennt abgestimmt sein, ohne die Kanäle voneinander abhängig zu machen.
 - Kontakt-, Punkt- und Partieende-Ereignisse verwenden semantisch passende Sounds. Ein punktentscheidender Kontakt erzeugt keinen doppelten Aufprall- und Punktsound.
-- Mobil bündelt ein Menü Pause, Neustart, Bestenliste, Audio, Bildrate und Anleitung. Das Öffnen pausiert; Fortsetzen erfolgt ausdrücklich.
+- Auf dem Desktop zeigt die Fußleiste Pause, Neustart, ein Menü und Feedback. Das Menü bündelt Bestenliste, Musik, Effekte und Bildrate und pausiert beim Öffnen nicht.
+- Mobil bündelt ein Menü Pause, Neustart, Bestenliste, Audio, Bildrate, Feedback und Anleitung. Das Öffnen pausiert; Fortsetzen erfolgt ausdrücklich.
+
+## Feedback
+
+- Über „Feedback“ öffnet sich ein Freitextfeld; das Öffnen pausiert die Partie, Fortsetzen erfolgt ausdrücklich.
+- Feedback ist anonym: gespeichert werden in Supabase nur der Text (3 bis 1000 Zeichen), Modus, Spielvariante, Schwierigkeit, Gerätetyp (Desktop oder Mobil) und der Zeitpunkt. Name, Kontaktdaten oder Browserkennung werden nicht erhoben.
+- Der Browser schreibt ausschließlich über eine Datenbankfunktion; die Feedback-Tabelle ist öffentlich weder lesbar noch direkt beschreibbar. Wiederholtes Senden desselben Entwurfs speichert ihn höchstens einmal. Eine grobe globale Mengenbremse schützt vor automatisierter Flut.
 
 ## Computer-Bestenliste
 

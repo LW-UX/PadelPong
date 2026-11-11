@@ -12,7 +12,7 @@ export function createInput(canvas, joystick, getTeam, onToggle, onLob = () => {
     if (knob) knob.style.transform = '';
   }
   window.addEventListener('keydown', e => {
-    if (e.target.closest('button, a, select, input, summary')) return;
+    if (e.target.closest('button, a, select, input, textarea, summary')) return;
     if (movementKeys.has(e.code)) { e.preventDefault(); keys.add(e.code); target = null; }
     if ((e.code === 'Space' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); onToggle(); }
     if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) {

@@ -1,12 +1,13 @@
 import { createState, createClock, start, pause, reset, step } from './physics.mjs?v=2026-10-11-lob-smash';
 import { createComputer } from './computer.mjs?v=2026-10-11-lob-smash';
 import { DIFFICULTIES, requireDifficulty, readDifficulty, saveDifficulty } from './difficulty.mjs?v=2026-09-13-easy-balanced';
-import { createInput } from './input.mjs?v=2026-10-11-lob-smash';
+import { createInput } from './input.mjs?v=2026-11-11-feedback';
 import { createRenderer } from './renderer.mjs?v=2026-10-11-lob-smash';
 import { mountLeaderboard, formatDuration } from './leaderboard.mjs?v=2026-10-11-lob-smash';
 import { OnlineSession, ONLINE, generateCode, normalizeCode } from './online.mjs?v=2026-10-11-lob-smash';
 import { COUNTDOWN_DURATION_MS, EFFECT_SOUND_NAMES, MUSIC_SOUND_NAMES, contactSoundName, countdownLabel, createSoundEffects, matchSoundName, pointSoundName, soundVolume } from './audio.mjs?v=2026-09-14-laptop-sounds';
 import { GAMEPLAY, gameplayConfig, readGameplay, requireGameplay, saveGameplay } from './gameplay.mjs';
+import { mountFeedback } from './feedback.mjs?v=2026-11-11-feedback';
 
 async function mount() {
   const canvas = document.getElementById('court');
@@ -35,6 +36,10 @@ async function mount() {
   const menu = document.getElementById('game-menu');
   const menuButton = document.getElementById('menu-open');
   const actions = document.querySelector('.action-buttons');
+  const settingsMenu = document.getElementById('settings-menu');
+  const settingsToggle = document.getElementById('settings-open');
+  const settingsPanel = document.getElementById('settings-panel');
+  const feedbackDialog = document.getElementById('feedback-dialog');
   const controls = document.querySelector('.controls');
   const game = document.getElementById('game');
   const arena = document.querySelector('.arena');
@@ -98,7 +103,7 @@ async function mount() {
   }
   function syncMusic() {
     const playing = online ? online.stage === 'playing' : ['rally', 'point'].includes(state.phase);
-    const shouldPlay = musicEnabled && playing && !document.hidden && !menu.open && document.getElementById('leaderboard').hidden;
+    const shouldPlay = musicEnabled && playing && !document.hidden && !menu.open && !feedbackDialog.open && document.getElementById('leaderboard').hidden;
     if (shouldPlay && !musicVoice) musicVoice = sounds.play('gameMusic', { enabled: true, loop: true, elementFallback: !sounds.webAudioReady });
     else if (!shouldPlay && musicVoice) { sounds.stop(musicVoice); musicVoice = null; }
   }
@@ -208,12 +213,12 @@ async function mount() {
     updateLobIndicators();
   }
   function toggleLob(side) {
-    if (online || localCountdown || menu.open || state.variant !== GAMEPLAY.lobSmash.id || state.phase !== 'rally') return;
+    if (online || localCountdown || menu.open || feedbackDialog.open || state.variant !== GAMEPLAY.lobSmash.id || state.phase !== 'rally') return;
     state.pendingLob[side] = !state.pendingLob[side];
     updateLobIndicators();
   }
   function toggle() {
-    if (menu.open || onlineSetup || !document.getElementById('leaderboard').hidden) return;
+    if (menu.open || feedbackDialog.open || onlineSetup || !document.getElementById('leaderboard').hidden) return;
     if (online) { input.clear(); if (['playing', 'countdown'].includes(online.stage)) online.requestPause(); else online.requestReady(); return; }
     if (localCountdown) return;
     cancelAnimationFrame(frameId); frameId = 0; previous = null;
@@ -223,7 +228,28 @@ async function mount() {
     input.clear(); simulation.reset(); update(); render(state); schedule();
   }
   input = createInput(canvas, null, () => state.teams[1], toggle, toggleLob, clearPendingLobs);
+  // Desktop shows leaderboard, audio and frame rate in a small popover menu;
+  // inside the mobile dialog the same controls are listed directly.
+  function setSettingsOpen(open) {
+    const popover = !mobileControls.matches;
+    settingsPanel.hidden = popover && !open;
+    settingsToggle.setAttribute('aria-expanded', String(popover && open));
+    settingsMenu.classList.toggle('is-open', popover && open);
+  }
+  settingsToggle.addEventListener('click', () => setSettingsOpen(settingsPanel.hidden));
+  document.addEventListener('pointerdown', event => {
+    if (!settingsPanel.hidden && !mobileControls.matches && !settingsMenu.contains(event.target)) setSettingsOpen(false);
+  });
+  settingsMenu.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || settingsPanel.hidden || mobileControls.matches) return;
+    event.preventDefault(); setSettingsOpen(false); settingsToggle.focus({ preventScroll: true });
+  });
+  settingsMenu.addEventListener('focusout', event => {
+    if (!mobileControls.matches && event.relatedTarget && !settingsMenu.contains(event.relatedTarget)) setSettingsOpen(false);
+  });
   function arrangeControls() {
+    settingsToggle.hidden = mobileControls.matches;
+    setSettingsOpen(false);
     localButton.disabled = mobileControls.matches;
     localButton.title = mobileControls.matches ? 'Nur mit Tastatur verfügbar' : '';
     if (mobileControls.matches) {
@@ -249,9 +275,20 @@ async function mount() {
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) menu.close();
   });
   actions.addEventListener('click', event => {
-    if (event.target.closest('#pause-button, #reset-button, #leaderboard-open')) menu.close();
+    if (event.target.closest('#pause-button, #reset-button, #leaderboard-open, #feedback-open')) menu.close();
+    if (event.target.closest('#leaderboard-open, #feedback-open')) setSettingsOpen(false);
   }, { capture: true });
   const leaderboard = mountLeaderboard({ pauseGame: stopForVisibility, getDifficulty: () => difficulty });
+  mountFeedback({
+    pauseGame: stopForVisibility,
+    onOpen: () => { menu.close(); setSettingsOpen(false); },
+    getContext: () => ({
+      mode: online ? 'online' : local ? 'local' : 'computer',
+      gameplay: online ? GAMEPLAY.standard.id : state.variant,
+      difficulty,
+      device: mobileControls.matches ? 'mobile' : 'desktop'
+    })
+  });
   function showPower(meter, label, value) {
     meter.value = value;
     label.textContent = value < -0.15 ? 'KURZ' : value > 0.85 ? 'ZU HART!' : value > 0.45 ? 'DRUCK' : 'RUHIG';

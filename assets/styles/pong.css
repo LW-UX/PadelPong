@@ -124,6 +124,14 @@ meter::-webkit-meter-suboptimum-value, meter::-webkit-meter-even-less-good-value
 .audio-toggle[aria-pressed="true"] .mute-mark,
 .audio-toggle[aria-pressed="false"] .sound-waves { display: none; }
 .fps-toggle { width: 72px; justify-content: center; white-space: nowrap; }
+.settings-menu { position: relative; }
+.settings-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.settings-caret { font-size: .7em; line-height: 1; transition: transform .15s; }
+.settings-menu.is-open .settings-toggle { border-color: var(--accent); color: var(--accent); }
+.settings-menu.is-open .settings-caret { transform: rotate(180deg); }
+.settings-panel { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); z-index: 30; display: grid; gap: 10px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.5); }
+.settings-panel > #leaderboard-open { width: 100%; }
+.settings-panel .settings-divider { display: block; border-top: 1px solid var(--border); }
 .mobile-help { display: none; }
 .mobile-menu-button { display: none; }
 @media (max-height: 690px) and (min-width: 801px) { .field-notes { padding-top: 20px; } .field-notes p:not(.eyebrow) { margin-bottom: 12px; } .key-grid { margin: 12px 0; } .height-demo { margin: 8px 0; } }
@@ -185,6 +193,18 @@ meter::-webkit-meter-suboptimum-value, meter::-webkit-meter-even-less-good-value
 .game-menu .action-buttons button, .game-menu .mobile-help summary { width: 100%; font-size: .85rem; justify-content: center; }
 .game-menu .audio-toggle, .game-menu .fps-toggle { font-size: .85rem !important; }
 .game-menu .mobile-help { display: block; }
+.game-menu .settings-menu, .game-menu .settings-panel { display: contents; }
+.feedback-dialog.game-menu { width: min(460px, calc(100vw - 28px)); min-width: 0; max-width: calc(100vw - 28px); }
+.feedback-form, .feedback-thanks { display: grid; gap: 12px; }
+.feedback-form label { font-size: .85rem; color: var(--dim); }
+.feedback-form textarea { width: 100%; min-height: 140px; resize: vertical; padding: 10px 12px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font: inherit; line-height: 1.45; }
+.feedback-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.feedback-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 1.2em; }
+#feedback-message.is-error { color: var(--negativ); }
+.feedback-count { color: var(--dim); font-size: .75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.feedback-count.is-over { color: var(--negativ); }
+.feedback-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.feedback-thanks .sh-meta { font-size: .9rem; }
 .game-menu .mobile-help summary { display: flex; list-style: none; }
 .game-menu .mobile-help summary::-webkit-details-marker { display: none; }
 .game-menu .mobile-instructions { display: grid; gap: 24px; padding-top: 24px; }
