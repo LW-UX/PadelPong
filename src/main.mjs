@@ -9,6 +9,7 @@ import { DoublesSession, seatLaneName, seatTeamName } from './online-doubles.mjs
 import { COUNTDOWN_DURATION_MS, EFFECT_SOUND_NAMES, MUSIC_SOUND_NAMES, contactSoundName, countdownLabel, createSoundEffects, matchSoundName, pointSoundName, soundVolume } from './audio.mjs?v=2026-09-14-laptop-sounds';
 import { GAMEPLAY, gameplayConfig, readGameplay, requireGameplay, saveGameplay } from './gameplay.mjs';
 import { mountFeedback } from './feedback.mjs?v=2026-11-11-feedback';
+import { mountVisitStats } from './visit-stats.mjs?v=2026-11-12-stats';
 
 async function mount() {
   const canvas = document.getElementById('court');
@@ -67,6 +68,7 @@ async function mount() {
   let onlineSetup = false, onlineMode = 'duel';
   let online = null, networkTimer = null, onlineAudioPending = false, localCountdown = null, localCountdownPending = false, countdownRequest = 0;
   let input, roundId = crypto.randomUUID();
+  const visitStats = mountVisitStats({ getDevice: () => mobileControls.matches ? 'mobile' : 'desktop' });
   // The laptop duel shows the same court twice: the WASD player sees it rotated
   // on the left, so both teams play from the bottom of their own view.
   function opponentView(source) {
@@ -328,8 +330,23 @@ async function mount() {
     meter.closest('.power-display').classList.toggle('danger', value > 0.85);
     meter.closest('.power-display').classList.toggle('short-shot', value < -0.15);
   }
+  // Maps the current screen to the coarse phases the anonymous visit statistics count.
+  function statsSnapshot() {
+    if (online) {
+      const stage = online.stage, interrupted = online.doubles ? online.interrupted : online.suspended;
+      return {
+        mode: online.doubles ? 'doubles' : 'online', variant: GAMEPLAY.standard.id,
+        phase: stage === 'over' ? 'over' : stage === 'playing' && !interrupted ? 'playing' : ['playing', 'countdown', 'paused'].includes(stage) ? 'active' : 'idle'
+      };
+    }
+    return {
+      mode: local ? 'local' : 'computer', variant: state.variant,
+      phase: ['rally', 'point'].includes(state.phase) ? 'playing' : state.phase === 'over' ? 'over' : state.phase === 'paused' ? 'active' : 'idle'
+    };
+  }
   function update() {
     if (online) Object.assign(state, online.view());
+    visitStats.observe(statsSnapshot());
     syncSoundEffects();
     syncMusic();
     humanScore.textContent = state.score[1]; computerScore.textContent = state.score[0];

@@ -63,7 +63,7 @@ Diese Datei ist die kanonische Quelle für das saisonunabhängige Spiel PadelPon
 ## 1v1 Laptop
 
 - Zwei Personen spielen an derselben Tastatur mit getrennten Tastengruppen. Maus- und Touch-Steuerung sind in diesem Modus ausgeschaltet.
-- Dasselbe Spielfeld wird zweimal nebeneinander gezeigt, damit keine Person oben spielen muss: links um 180 Grad gedreht für WASD (Korall), rechts normal für die Pfeiltasten (Gelb). Beide sehen das eigene Team unten; Teamfarben bleiben in beiden Ansichten gleich.
+- Dasselbe Spielfeld wird zweimal gezeigt, damit keine Person oben spielen muss. Die Felder sitzen am linken und rechten Rand, die Mitte bleibt frei, damit sich jede Person auf ihre Seite konzentriert: links um 180 Grad gedreht für WASD (Korall), rechts normal für die Pfeiltasten (Gelb). Beide sehen das eigene Team unten; Teamfarben bleiben in beiden Ansichten gleich.
 - Die WASD-Tasten gelten relativ zur gedrehten Ansicht: W läuft zum Netz, A und D bewegen auf dem eigenen Bildschirm nach links und rechts.
 - Der Modus benötigt weder Raumcode, Anmeldung noch Netzwerk. Auf Touch-Geräten bleibt er sichtbar, aber deaktiviert.
 - Pause, Fokusverlust, Revanche und Rückkehr zur Modusauswahl gelten gemeinsam für beide Personen.

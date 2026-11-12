@@ -289,21 +289,21 @@ table.pong-ranking .col-name { width: auto; }
 }
 
 .local-duel .solo-controls { display: none; }
-/* Laptop duel: the same court twice, the WASD view rotated on the left. */
-.local-duel .game-layout { container-type: size; grid-template-columns: minmax(0, 1fr); }
-/* Two 272:496 courts side by side; 105px covers scoreboard, status line and gaps. */
-.local-duel .arena { justify-self: center; width: min(100%, 980px, calc((100cqh - 105px) * 544 / 496 + 24px)); }
-.local-duel .court-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 24px; }
-.local-duel .court-wrap > canvas { min-width: 0; min-height: 0; }
-.local-duel #court-opponent { object-position: right center; }
-.local-duel #court { object-position: left center; }
+/* Laptop duel: the same court twice at the outer edges, the WASD view rotated
+   on the left. The free space in the middle keeps each player on their side. */
+.local-duel .game-layout { grid-template-columns: minmax(0, 1fr); }
+.local-duel .court-wrap { container-type: size; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 24px; }
+.local-duel .court-wrap > canvas { --court-width: min(50cqw - 12px, 100cqh * 272 / 496); width: var(--court-width); height: 100%; min-height: 0; }
+.local-duel #court-opponent { justify-self: start; object-position: left center; }
+.local-duel #court { justify-self: end; object-position: right center; }
 .local-duel .scoreboard, .local-duel .team-label { flex-direction: row-reverse; }
-.local-duel .lob-status-human { left: 75%; }
-.local-duel .lob-status-opponent { top: auto; bottom: 15%; left: 25%; }
+.local-duel .lob-status-human { left: auto; right: calc(min(50cqw - 12px, 100cqh * 272 / 496) / 2); transform: translateX(50%); }
+.local-duel .lob-status-opponent { top: auto; bottom: 15%; left: calc(min(50cqw - 12px, 100cqh * 272 / 496) / 2); }
 #opponent-power-label { color: var(--coral); }
 #opponent-power-display.danger #opponent-power-label { color: var(--coral); }
 .local-duel .power-display { width: 150px; }
 @media (pointer: fine) and (min-width: 801px) {
+  .local-duel .controls { justify-content: space-between; }
   .local-duel .controls > #opponent-power-display { order: -1; }
   .local-duel .controls > .power-display:not(#opponent-power-display) { order: 1; }
 }
