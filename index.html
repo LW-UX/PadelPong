@@ -133,8 +133,9 @@
         <div class="action-divider" role="separator"></div>
         <div class="settings-menu" id="settings-menu">
           <button class="secondary-button settings-toggle" id="settings-open" type="button" aria-expanded="false" aria-controls="settings-panel">Menü <span class="settings-caret" aria-hidden="true">▴</span></button>
-          <div class="settings-panel" id="settings-panel" role="group" aria-label="Bestenliste, Ton und Bildrate" hidden>
+          <div class="settings-panel" id="settings-panel" role="group" aria-label="Bestenliste, Erklärung, Ton und Bildrate" hidden>
             <button class="secondary-button" id="leaderboard-open" type="button">Bestenliste</button>
+            <button class="secondary-button" id="help-open" type="button" aria-haspopup="dialog" aria-controls="help-dialog">Erklärung</button>
             <div class="action-divider settings-divider" role="separator"></div>
             <div class="playback-settings">
               <button class="secondary-button audio-toggle" id="music-toggle" type="button" aria-label="Musik stummschalten" aria-pressed="true" title="Musik stummschalten">
@@ -150,7 +151,6 @@
           </div>
         </div>
         <div class="action-divider" role="separator"></div>
-        <button class="secondary-button" id="help-open" type="button" aria-haspopup="dialog" aria-controls="help-dialog">Erklärung</button>
         <button class="secondary-button" id="feedback-open" type="button" aria-haspopup="dialog" aria-controls="feedback-dialog">Feedback</button>
       </div>
       <button class="secondary-button mobile-menu-button" id="menu-open" type="button" aria-haspopup="dialog" aria-controls="game-menu" disabled>Menü</button>
@@ -190,6 +190,8 @@
         <p class="sh-meta">Der Schatten zeigt die Position am Boden. Hohe Bälle fliegen über die Balken.</p>
         <p class="sh-meta">Das kleine Quadrat zeigt den nächsten Aufprall. Orange warnt vor einem direkten Wand- oder Zaunfehler.</p>
         <p class="sh-meta lob-help" hidden>Ein Lob steigt hoch und tief ins gegnerische Feld. Stehst du passend am Netz, wird ein fallender gegnerischer Lob automatisch zum Smash.</p>
+        <p class="widget-label micro">ANONYME STATISTIK</p>
+        <p class="sh-meta">Ohne Cookies und ohne dauerhafte Kennung zählt PadelPong je Seitenaufruf nur Verweildauer, Spielzeit, gespielte Modi, Gerätetyp und die verweisende Website. „Do Not Track“ und „Global Privacy Control“ schalten das ab.</p>
       </aside>
     </div>
   </dialog>

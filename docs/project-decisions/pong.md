@@ -40,8 +40,8 @@ Diese Datei ist die kanonische Quelle für das saisonunabhängige Spiel PadelPon
 - Musik und Effekte besitzen getrennte gespeicherte Schalter. Musik läuft nur während aktivem Spiel; Menüs, Pause, Countdown und Ergebnisansicht bleiben musikfrei.
 - Audio wird über einen langlebigen Mixer vorgeladen und mit der ersten Nutzerinteraktion aktiviert. Mobile und Desktop-Wiedergabe dürfen getrennt abgestimmt sein, ohne die Kanäle voneinander abhängig zu machen.
 - Kontakt-, Punkt- und Partieende-Ereignisse verwenden semantisch passende Sounds. Ein punktentscheidender Kontakt erzeugt keinen doppelten Aufprall- und Punktsound.
-- Auf dem Desktop zeigt die Fußleiste Pause, Neustart, ein Menü, Erklärung und Feedback. Das Menü bündelt Bestenliste, Musik, Effekte und Bildrate und pausiert beim Öffnen nicht.
-- Mobil bündelt ein Menü Pause, Neustart, Bestenliste, Audio, Bildrate, Erklärung und Feedback. Das Öffnen pausiert; Fortsetzen erfolgt ausdrücklich.
+- Auf dem Desktop zeigt die Fußleiste Pause, Neustart, ein Menü und Feedback. Das Menü bündelt Bestenliste, Erklärung, Musik, Effekte und Bildrate und pausiert beim Öffnen nicht.
+- Mobil bündelt ein Menü Pause, Neustart, Bestenliste, Erklärung, Audio, Bildrate und Feedback. Das Öffnen pausiert; Fortsetzen erfolgt ausdrücklich.
 - Steuerung („01 / Steuerung“) und Regeln („02 / So läuft’s“) stehen nicht neben dem Spielfeld, sondern gemeinsam im eigenen Menüpunkt „Erklärung“. Das Öffnen pausiert die Partie; Fortsetzen erfolgt ausdrücklich.
 
 ## Feedback
@@ -49,6 +49,15 @@ Diese Datei ist die kanonische Quelle für das saisonunabhängige Spiel PadelPon
 - Über „Feedback“ öffnet sich ein Freitextfeld; das Öffnen pausiert die Partie, Fortsetzen erfolgt ausdrücklich.
 - Feedback ist anonym: gespeichert werden in Supabase nur der Text (3 bis 1000 Zeichen), Modus (2v2 Online zählt als „online“), Spielvariante, Schwierigkeit, Gerätetyp (Desktop oder Mobil) und der Zeitpunkt. Name, Kontaktdaten oder Browserkennung werden nicht erhoben.
 - Der Browser schreibt ausschließlich über eine Datenbankfunktion; die Feedback-Tabelle ist öffentlich weder lesbar noch direkt beschreibbar. Wiederholtes Senden desselben Entwurfs speichert ihn höchstens einmal. Eine grobe globale Mengenbremse schützt vor automatisierter Flut.
+
+## Besuchsstatistik
+
+- PadelPong erhebt eine eigene anonyme Besuchsstatistik in Supabase. Externe Analyse-Dienste, Cookies, Browser-Speicher und Einwilligungsbanner werden dafür nicht verwendet.
+- Je Seitenaufruf entsteht eine zufällige Kennung, die nur im Arbeitsspeicher liegt. Gespeichert werden ausschließlich Gerätetyp (Desktop oder Mobil), die verweisende Website (nur der Host; auf `lw-ux.github.io` zusätzlich der erste Pfadabschnitt, um Schwesterprojekte wie die Liga zu unterscheiden), sichtbare Verweildauer, aktive Spielzeit, gestartete und beendete Partien, Partien je Modus (Computer, Laptop, 1v1 Online, 2v2 Online), Partien in „Lob/Smash“ sowie Zeitstempel.
+- Eine Partie zählt als gestartet, sobald der Ball erstmals im Spiel ist, und als beendet, wenn sie regulär endet. Spielzeit zählt nur bei sichtbarem Tab und laufendem Ballwechsel, nicht in Pause, Countdown oder bei unterbrochener Online-Verbindung.
+- Der Browser sendet die laufenden Summen, wenn der Tab verborgen wird, beim Verlassen der Seite und nach jeder beendeten Partie. Die Datenbank behält je Besuch stets den größten Wert und erweitert einen Besuch höchstens einen Tag lang. Nie sichtbare (vorgerenderte) Seiten senden nichts.
+- Erfasst wird nur auf `lw-ux.github.io`, nicht bei lokalen Tests. „Do Not Track“ und „Global Privacy Control“ schalten die Erfassung ab. Die Erklärung weist auf die Statistik hin.
+- Der Browser schreibt ausschließlich über eine Datenbankfunktion; Tabelle und Tagesübersicht sind öffentlich weder lesbar noch direkt beschreibbar. Eine grobe globale Mengenbremse verwirft neue Besuche bei automatisierter Flut. Fehler der Statistik stören das Spiel nie.
 
 ## Computer-Bestenliste
 

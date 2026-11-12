@@ -309,7 +309,7 @@ async function mount() {
   });
   helpDialog.addEventListener('close', () => {
     if (mobileControls.matches) menuButton.focus({ preventScroll: true });
-    else helpOpen.focus({ preventScroll: true });
+    else settingsToggle.focus({ preventScroll: true });
     syncMusic();
   });
   const leaderboard = mountLeaderboard({ pauseGame: stopForVisibility, getDifficulty: () => difficulty });

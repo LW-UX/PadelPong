@@ -130,7 +130,7 @@ meter::-webkit-meter-suboptimum-value, meter::-webkit-meter-even-less-good-value
 .settings-menu.is-open .settings-toggle { border-color: var(--accent); color: var(--accent); }
 .settings-menu.is-open .settings-caret { transform: rotate(180deg); }
 .settings-panel { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); z-index: 30; display: grid; gap: 10px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.5); }
-.settings-panel > #leaderboard-open { width: 100%; }
+.settings-panel > #leaderboard-open, .settings-panel > #help-open { width: 100%; }
 .settings-panel .settings-divider { display: block; border-top: 1px solid var(--border); }
 .mobile-menu-button { display: none; }
 @media (max-width: 800px) {
