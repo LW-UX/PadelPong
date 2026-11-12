@@ -76,7 +76,8 @@ test('local duel reads simultaneous opposing diagonals independently and release
   const h = await inputHarness();
   try {
     h.input.setLocalMultiplayer(true);
-    for (const code of ['ArrowUp', 'ArrowRight', 'KeyS', 'KeyA']) event(h.win, 'keydown', { code });
+    // WASD plays on a rotated view: W runs to the net, D moves right on that screen.
+    for (const code of ['ArrowUp', 'ArrowRight', 'KeyW', 'KeyD']) event(h.win, 'keydown', { code });
     assert.deepEqual(h.input.read(), { x: 1, y: -1 });
     assert.deepEqual(h.input.readOpponent(), { x: -1, y: 1 });
     const { createState, start, step, C } = await import('../src/physics.mjs');
@@ -88,7 +89,7 @@ test('local duel reads simultaneous opposing diagonals independently and release
       assert.ok(Math.hypot(team.vx, team.vy) <= C.speed + 1e-6);
       assert.ok(team.power > 0);
     }
-    event(h.win, 'keyup', { code: 'KeyS' }); event(h.win, 'keyup', { code: 'KeyA' });
+    event(h.win, 'keyup', { code: 'KeyW' }); event(h.win, 'keyup', { code: 'KeyD' });
     assert.deepEqual(h.input.readOpponent(), { x: 0, y: 0 });
     assert.deepEqual(h.input.read(), { x: 1, y: -1 });
     event(h.win, 'blur');
@@ -109,7 +110,9 @@ test('local duel ignores mouse and touch and mode changes clear held keys withou
     assert.deepEqual(h.input.read(), { x: 0, y: 0 });
     event(h.win, 'keydown', { code: 'KeyW' });
     assert.deepEqual(h.input.read(), { x: 0, y: 0 });
-    assert.deepEqual(h.input.readOpponent(), { x: 0, y: -1 });
+    assert.deepEqual(h.input.readOpponent(), { x: 0, y: 1 });
+    event(h.win, 'keyup', { code: 'KeyW' }); event(h.win, 'keydown', { code: 'KeyS' }); event(h.win, 'keydown', { code: 'KeyA' });
+    assert.deepEqual(h.input.readOpponent(), { x: 1, y: -1 });
     h.input.setLocalMultiplayer(false);
     assert.deepEqual(h.input.read(), { x: 0, y: 0 });
     assert.deepEqual(h.input.readOpponent(), { x: 0, y: 0 });

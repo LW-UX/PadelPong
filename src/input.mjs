@@ -1,4 +1,4 @@
-import { C, clamp } from './physics.mjs?v=2026-10-11-lob-smash';
+import { C, clamp } from './physics.mjs?v=2026-11-12-doubles';
 
 export function createInput(canvas, joystick, getTeam, onToggle, onLob = () => {}, onInterrupted = () => {}) {
   const abort = new AbortController(), options = { signal: abort.signal };
@@ -69,10 +69,12 @@ export function createInput(canvas, joystick, getTeam, onToggle, onLob = () => {
   return {
     clear,
     setLocalMultiplayer(enabled) { localMultiplayer = Boolean(enabled); clear(); },
+    // The WASD player sees the court rotated, so keys follow that view:
+    // W runs towards the net and A moves left on their screen.
     readOpponent() {
       return localMultiplayer ? {
-        x: Number(keys.has('KeyD')) - Number(keys.has('KeyA')),
-        y: Number(keys.has('KeyS')) - Number(keys.has('KeyW'))
+        x: Number(keys.has('KeyA')) - Number(keys.has('KeyD')),
+        y: Number(keys.has('KeyW')) - Number(keys.has('KeyS'))
       } : { x: 0, y: 0 };
     },
     read() {

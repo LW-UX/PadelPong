@@ -29,17 +29,33 @@ export const heightAt = (b, t) => b.z + b.vz * t - C.gravity * t * t / 2;
 export function groundTime(b) {
   return (b.vz + Math.sqrt(Math.max(0, b.vz * b.vz + 2 * C.gravity * b.z))) / C.gravity;
 }
-export function createState({ variant = GAMEPLAY.standard.id } = {}) {
+const homeBody = side => ({ side, offset: 0, y: side ? 17 : 3, vx: 0, vy: 0, power: 0 });
+export const PADDLE_BASES = Object.freeze([2.5, 7.5]);
+// Classic teams move both paddles together. In doubles each paddle is its own
+// body; lane 0 is always the paddle at court x 2.5, lane 1 the one at 7.5.
+export function teamBodies(team) {
+  return PADDLE_BASES.map((base, lane) => ({ base, lane, body: team.players ? team.players[lane] : team }));
+}
+export function captureOrigins(state) {
+  return state.teams.map(team => team.players ? team.players.map(p => ({ offset: p.offset, y: p.y })) : { offset: team.offset, y: team.y });
+}
+const originOf = (origins, side, lane) => Array.isArray(origins[side]) ? origins[side][lane] : origins[side];
+export function createState({ variant = GAMEPLAY.standard.id, doubles = false } = {}) {
   return {
     ruleset: RULESET, variant: requireGameplay(variant), phase: 'ready', resumePhase: 'rally', score: [0, 0], time: 0,
-    teams: [0, 1].map(side => ({ side, offset: 0, y: side ? 17 : 3, vx: 0, vy: 0, power: 0 })),
+    teams: [0, 1].map(side => doubles ? { side, players: [homeBody(side), homeBody(side)] } : homeBody(side)),
+    ...(doubles ? { doubles: true } : {}),
     ball: { x: 2.5, y: 17, z: 0.8, vx: 0, vy: 0, vz: 0, lastHit: 1, bounces: 0, feed: true, contactSide: null, shotType: 'feed' },
     pendingLob: [false, false], lastShot: 'feed',
     message: 'Bereit für eine kurze Partie?', rallyHits: 0, bestRally: 0,
     pointTimer: 0, effects: [], effectSequence: 0, pointContactEffectId: null, winner: null
   };
 }
-export function reset(state, { variant = state.variant ?? GAMEPLAY.standard.id } = {}) { Object.assign(state, createState({ variant })); }
+export function reset(state, { variant = state.variant ?? GAMEPLAY.standard.id, doubles = Boolean(state.doubles) } = {}) {
+  const fresh = createState({ variant, doubles });
+  for (const key of Object.keys(state)) if (!(key in fresh)) delete state[key];
+  Object.assign(state, fresh);
+}
 export function pause(state) {
   if (state.phase === 'rally' || state.phase === 'point') {
     state.pendingLob?.fill(false);
@@ -54,7 +70,7 @@ export function start(state) {
 export function feed(state) {
   const total = state.score[0] + state.score[1];
   const server = total % 2 ? 0 : 1;
-  state.teams.forEach(t => Object.assign(t, { offset: 0, y: t.side ? 17 : 3, vx: 0, vy: 0, power: 0 }));
+  state.teams.forEach(t => teamBodies(t).forEach(({ body }) => Object.assign(body, homeBody(t.side))));
   const x = total % 4 < 2 ? 2.5 : 7.5;
   Object.assign(state.ball, { x, y: server ? 17 : 3, z: 0.8, lastHit: server, bounces: 0, feed: true, contactSide: null, shotType: 'feed' });
   // Safe diagonal opening ball; it is intentionally not an official serve.
@@ -186,8 +202,8 @@ function paddleTime(b, paddle, remaining, reach = C.reach) {
   const descend = (b.vz + Math.sqrt(disc)) / C.gravity;
   return descend >= entry && descend <= leave ? descend : null;
 }
-function smashAvailable(state, side) {
-  const team = state.teams[side], b = state.ball;
+function smashAvailable(state, side, team = state.teams[side]) {
+  const b = state.ball;
   return state.variant === GAMEPLAY.lobSmash.id && b.shotType === 'lob' && b.bounces === 0
     && !state.pendingLob[side] && Math.abs(team.y - C.net) <= C.smashNetDistance;
 }
@@ -195,7 +211,7 @@ function advance(b, t) {
   b.x += b.vx * t; b.y += b.vy * t;
   b.z = Math.max(0, heightAt(b, t)); b.vz -= C.gravity * t;
 }
-export function simulateBall(state, dt, origins = state.teams.map(t => ({ ...t })), computerStroke = null) {
+export function simulateBall(state, dt, origins = captureOrigins(state), computerStroke = null) {
   const b = state.ball;
   let remaining = dt, elapsed = 0;
   for (let iteration = 0; remaining > EPS && iteration < 20 && state.phase === 'rally'; iteration++) {
@@ -213,23 +229,25 @@ export function simulateBall(state, dt, origins = state.teams.map(t => ({ ...t }
     // A stroke starts inside the paddle's collision volume. Suppress that same
     // continuous overlap until the ball leaves it, then count a new contact.
     if (b.contactSide != null) {
-      const team = state.teams[b.contactSide], origin = origins[b.contactSide];
-      const touching = b.z <= C.reach && [2.5, 7.5].some(base =>
-        Math.abs(b.x - (base + origin.offset + team.vx * elapsed)) <= C.paddleWidth / 2 + C.radius + EPS
-        && Math.abs(b.y - (origin.y + team.vy * elapsed)) <= C.paddleDepth / 2 + C.radius + EPS);
+      const side = b.contactSide;
+      const touching = b.z <= C.reach && teamBodies(state.teams[side]).some(({ base, lane, body }) => {
+        const origin = originOf(origins, side, lane);
+        return Math.abs(b.x - (base + origin.offset + body.vx * elapsed)) <= C.paddleWidth / 2 + C.radius + EPS
+          && Math.abs(b.y - (origin.y + body.vy * elapsed)) <= C.paddleDepth / 2 + C.radius + EPS;
+      });
       if (!touching) b.contactSide = null;
     }
     for (const side of [0, 1]) {
       if (b.contactSide === side || (b.feed && (b.bounces === 0 || side === b.lastHit))) continue;
-      const team = state.teams[side], origin = origins[side];
-      for (const base of [2.5, 7.5]) {
-        const paddle = { x: base + origin.offset + team.vx * elapsed, y: origin.y + team.vy * elapsed, vx: team.vx, vy: team.vy };
-        const canSmash = smashAvailable(state, side);
+      for (const { base, lane, body } of teamBodies(state.teams[side])) {
+        const origin = originOf(origins, side, lane);
+        const paddle = { x: base + origin.offset + body.vx * elapsed, y: origin.y + body.vy * elapsed, vx: body.vx, vy: body.vy };
+        const canSmash = smashAvailable(state, side, body);
         const t = paddleTime(b, paddle, remaining, canSmash ? C.smashReach : C.reach);
         if (t !== null) {
           const z = heightAt(b, t), falling = b.vz - C.gravity * t < 0;
           const shotType = canSmash && falling && z > C.reach + EPS ? 'smash' : null;
-          if (z <= C.reach + EPS || shotType) add(t, 'paddle', 3, { side, x: paddle.x + team.vx * t, shotType });
+          if (z <= C.reach + EPS || shotType) add(t, 'paddle', 3, { side, body, x: paddle.x + body.vx * t, shotType });
         }
       }
     }
@@ -259,23 +277,36 @@ export function simulateBall(state, dt, origins = state.teams.map(t => ({ ...t }
         awardPoint(state, returned ? b.lastHit : 1 - b.lastHit, returned ? 'Nach Aufsprung zurück ins Netz' : 'Im Netz');
       }
     } else {
-      hitBall(state, event.side, event.x, state.teams[event.side], event.side === 0 ? computerStroke : null, event.shotType);
+      hitBall(state, event.side, event.x, event.body, event.side === 0 ? computerStroke : null, event.shotType);
     }
   }
 }
-export function step(state, human = { x: 0, y: 0 }, computer = { x: 0, y: 0 }, computerStroke = null) {
-  if (state.phase !== 'rally' && state.phase !== 'point') return;
+// Shared tick prelude: time, effect ageing and the pause between points.
+// Returns true when the rally itself should advance this tick.
+function tickRally(state) {
+  if (state.phase !== 'rally' && state.phase !== 'point') return false;
   state.time += C.step;
   state.effects.forEach(e => { e.age += C.step; });
   if (state.phase === 'point') {
     state.pointTimer -= C.step;
     if (state.pointTimer <= 0) feed(state);
-    return;
+    return false;
   }
-  const origins = state.teams.map(t => ({ ...t }));
+  return true;
+}
+export function step(state, human = { x: 0, y: 0 }, computer = { x: 0, y: 0 }, computerStroke = null) {
+  if (!tickRally(state)) return;
+  const origins = captureOrigins(state);
   moveTeam(state.teams[0], computer, C.step);
   moveTeam(state.teams[1], human, C.step);
   simulateBall(state, C.step, origins, computerStroke);
+}
+// Doubles: inputs[side][lane] steers exactly one paddle each.
+export function stepDoubles(state, inputs) {
+  if (!tickRally(state)) return;
+  const origins = captureOrigins(state);
+  state.teams.forEach((team, side) => team.players.forEach((body, lane) => moveTeam(body, inputs?.[side]?.[lane] ?? { x: 0, y: 0 }, C.step)));
+  simulateBall(state, C.step, origins);
 }
 // Frame rate changes only presentation; each call consumes 60 Hz simulation ticks.
 export function createClock(tick) {

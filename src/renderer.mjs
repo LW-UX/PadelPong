@@ -1,4 +1,4 @@
-import { C, predictLanding } from './physics.mjs?v=2026-10-11-lob-smash';
+import { C, predictLanding, teamBodies } from './physics.mjs?v=2026-11-12-doubles';
 
 export async function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -11,12 +11,18 @@ export async function createRenderer(canvas) {
   return function render(state) {
     ctx.drawImage(court, 0, 0, 272, 496);
     for (const team of state.teams) {
-      for (const base of [2.5, 7.5]) {
-        const x = px(base + team.offset), y = py(team.y), w = C.paddleWidth * 22.4;
+      // Doubles keeps team colours fixed for every viewer; otherwise own = yellow.
+      const yellow = team.tint ? team.tint === 'gelb' : team.side === 1;
+      for (const { base, lane, body } of teamBodies(team)) {
+        const x = px(base + body.offset), y = py(body.y), w = C.paddleWidth * 22.4;
         rect(x - w / 2 + 2, y + 3, w, 5, '#12273e');
         rect(x - w / 2 - 1, y - 4, w + 2, 8, '#101d29');
-        rect(x - w / 2, y - 3, w, 5, team.side ? '#e8f36a' : '#fa9278');
-        rect(x - w / 2 + 1, y - 3, w - 2, 1, team.side ? '#ffffbb' : '#ffd2ae');
+        rect(x - w / 2, y - 3, w, 5, yellow ? '#e8f36a' : '#fa9278');
+        rect(x - w / 2 + 1, y - 3, w - 2, 1, yellow ? '#ffffbb' : '#ffd2ae');
+        if (state.me && state.me.side === team.side && state.me.lane === lane) {
+          // Small arrow under the paddle this device steers.
+          rect(x - 1, y + 9, 3, 1, '#ffffff'); rect(x - 2, y + 10, 5, 1, '#ffffff'); rect(x - 3, y + 11, 7, 2, '#ffffff');
+        }
       }
     }
     if (state.phase === 'rally' || state.phase === 'paused') {

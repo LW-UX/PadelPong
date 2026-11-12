@@ -1,6 +1,6 @@
 # PadelPong
 
-PadelPong ist ein öffentliches Retro-Minispiel mit Einzelspieler-, Laptop- und Online-Modus. Die statische Website wird ohne Build-Schritt über GitHub Pages veröffentlicht.
+PadelPong ist ein öffentliches Retro-Minispiel mit Einzelspieler-, Laptop- und Online-Modus (1v1 und 2v2). Die statische Website wird ohne Build-Schritt über GitHub Pages veröffentlicht.
 
 ## Lokal prüfen
 

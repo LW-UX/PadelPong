@@ -1,4 +1,4 @@
-import { C, clamp, predictLanding } from './physics.mjs?v=2026-10-11-lob-smash';
+import { C, clamp, predictLanding } from './physics.mjs?v=2026-11-12-doubles';
 import { COMPUTER_PROFILES } from './difficulty.mjs?v=2026-09-13-easy-balanced';
 import { GAMEPLAY } from './gameplay.mjs';
 

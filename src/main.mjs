@@ -1,17 +1,20 @@
-import { createState, createClock, start, pause, reset, step } from './physics.mjs?v=2026-10-11-lob-smash';
-import { createComputer } from './computer.mjs?v=2026-10-11-lob-smash';
+import { C, createState, createClock, start, pause, reset, step, predictLanding } from './physics.mjs?v=2026-11-12-doubles';
+import { createComputer } from './computer.mjs?v=2026-11-12-doubles';
 import { DIFFICULTIES, requireDifficulty, readDifficulty, saveDifficulty } from './difficulty.mjs?v=2026-09-13-easy-balanced';
-import { createInput } from './input.mjs?v=2026-11-11-feedback';
-import { createRenderer } from './renderer.mjs?v=2026-10-11-lob-smash';
+import { createInput } from './input.mjs?v=2026-11-12-doubles';
+import { createRenderer } from './renderer.mjs?v=2026-11-12-doubles';
 import { mountLeaderboard, formatDuration } from './leaderboard.mjs?v=2026-10-11-lob-smash';
-import { OnlineSession, ONLINE, generateCode, normalizeCode } from './online.mjs?v=2026-10-11-lob-smash';
+import { OnlineSession, ONLINE, generateCode, normalizeCode, perspective } from './online.mjs?v=2026-11-12-doubles';
+import { DoublesSession, seatLaneName, seatTeamName } from './online-doubles.mjs?v=2026-11-12-doubles';
 import { COUNTDOWN_DURATION_MS, EFFECT_SOUND_NAMES, MUSIC_SOUND_NAMES, contactSoundName, countdownLabel, createSoundEffects, matchSoundName, pointSoundName, soundVolume } from './audio.mjs?v=2026-09-14-laptop-sounds';
 import { GAMEPLAY, gameplayConfig, readGameplay, requireGameplay, saveGameplay } from './gameplay.mjs';
 import { mountFeedback } from './feedback.mjs?v=2026-11-11-feedback';
 
 async function mount() {
   const canvas = document.getElementById('court');
-  const render = await createRenderer(canvas);
+  const opponentCanvas = document.getElementById('court-opponent');
+  const renderCourt = await createRenderer(canvas);
+  const renderOpponentCourt = await createRenderer(opponentCanvas);
   let gameplay = readGameplay();
   const state = createState({ variant: gameplay });
   let difficulty = readDifficulty();
@@ -40,11 +43,8 @@ async function mount() {
   const settingsToggle = document.getElementById('settings-open');
   const settingsPanel = document.getElementById('settings-panel');
   const feedbackDialog = document.getElementById('feedback-dialog');
+  const helpDialog = document.getElementById('help-dialog');
   const controls = document.querySelector('.controls');
-  const game = document.getElementById('game');
-  const arena = document.querySelector('.arena');
-  const instructions = document.querySelector('.field-notes');
-  const rules = document.querySelector('.right-notes');
   const mobileControls = matchMedia('(pointer: coarse), (max-width: 800px)');
   let frameId = 0, previous = null, lastPaint = -Infinity, displayedPhase = '';
   let frameRate = 60;
@@ -54,15 +54,32 @@ async function mount() {
   const onlineSetupPanel = document.getElementById('online-setup');
   const roomInfo = document.getElementById('room-info');
   const onlineButton = document.getElementById('online-open');
+  const doublesButton = document.getElementById('doubles-open');
+  const doublesLobby = document.getElementById('doubles-lobby');
+  const seatButtons = [...doublesLobby.querySelectorAll('[data-seat]')];
+  const shuffleButton = document.getElementById('shuffle-teams');
   const leaveButton = document.getElementById('leave-room');
   const localButton = document.getElementById('local-open');
   const localBackButton = document.getElementById('local-back');
   const gameOverBackButton = document.getElementById('game-over-back');
   const opponentPower = document.getElementById('opponent-power');
   let local = false;
-  let onlineSetup = false;
+  let onlineSetup = false, onlineMode = 'duel';
   let online = null, networkTimer = null, onlineAudioPending = false, localCountdown = null, localCountdownPending = false, countdownRequest = 0;
   let input, roundId = crypto.randomUUID();
+  // The laptop duel shows the same court twice: the WASD player sees it rotated
+  // on the left, so both teams play from the bottom of their own view.
+  function opponentView(source) {
+    const view = perspective(source, 0);
+    const landing = source.ball.landing === undefined ? predictLanding(source.ball) : source.ball.landing;
+    view.ball.landing = landing ? { ...landing, x: C.width - landing.x, y: C.length - landing.y } : null;
+    view.teams[0].tint = 'gelb'; view.teams[1].tint = 'korall';
+    return view;
+  }
+  function render(view) {
+    renderCourt(view);
+    if (local) renderOpponentCourt(opponentView(view));
+  }
   const musicPreferenceKey = 'pong-music-enabled';
   let musicEnabled = true;
   try { musicEnabled = localStorage.getItem(musicPreferenceKey) !== 'false'; } catch {}
@@ -103,7 +120,7 @@ async function mount() {
   }
   function syncMusic() {
     const playing = online ? online.stage === 'playing' : ['rally', 'point'].includes(state.phase);
-    const shouldPlay = musicEnabled && playing && !document.hidden && !menu.open && !feedbackDialog.open && document.getElementById('leaderboard').hidden;
+    const shouldPlay = musicEnabled && playing && !document.hidden && !menu.open && !feedbackDialog.open && !helpDialog.open && document.getElementById('leaderboard').hidden;
     if (shouldPlay && !musicVoice) musicVoice = sounds.play('gameMusic', { enabled: true, loop: true, elementFallback: !sounds.webAudioReady });
     else if (!shouldPlay && musicVoice) { sounds.stop(musicVoice); musicVoice = null; }
   }
@@ -160,7 +177,7 @@ async function mount() {
     if (onlineStage === 'countdown' && lastOnlineStage !== 'countdown') {
       sounds.stopAll();
       musicVoice = null;
-      const remaining = online.role === 'host' ? online.countdownUntil - online.now() : online.countdown;
+      const remaining = online.role === 'host' || online.doubles ? online.countdownUntil - online.now() : online.countdown;
       const elapsedSeconds = (ONLINE.countdown - Math.max(0, remaining)) / 1000;
       onlineCountdownVoice = sounds.play('countdown', { offsetSeconds: elapsedSeconds });
     }
@@ -213,12 +230,12 @@ async function mount() {
     updateLobIndicators();
   }
   function toggleLob(side) {
-    if (online || localCountdown || menu.open || feedbackDialog.open || state.variant !== GAMEPLAY.lobSmash.id || state.phase !== 'rally') return;
+    if (online || localCountdown || menu.open || feedbackDialog.open || helpDialog.open || state.variant !== GAMEPLAY.lobSmash.id || state.phase !== 'rally') return;
     state.pendingLob[side] = !state.pendingLob[side];
     updateLobIndicators();
   }
   function toggle() {
-    if (menu.open || feedbackDialog.open || onlineSetup || !document.getElementById('leaderboard').hidden) return;
+    if (menu.open || feedbackDialog.open || helpDialog.open || onlineSetup || !document.getElementById('leaderboard').hidden) return;
     if (online) { input.clear(); if (['playing', 'countdown'].includes(online.stage)) online.requestPause(); else online.requestReady(); return; }
     if (localCountdown) return;
     cancelAnimationFrame(frameId); frameId = 0; previous = null;
@@ -227,7 +244,9 @@ async function mount() {
     else if (state.phase !== 'over') start(state);
     input.clear(); simulation.reset(); update(); render(state); schedule();
   }
-  input = createInput(canvas, null, () => state.teams[1], toggle, toggleLob, clearPendingLobs);
+  // In 2v2 each device steers one paddle of its (bottom) team; otherwise the team itself.
+  function ownBody() { return state.teams[1].players?.[state.me?.lane ?? 0] ?? state.teams[1]; }
+  input = createInput(canvas, null, ownBody, toggle, toggleLob, clearPendingLobs);
   // Desktop shows leaderboard, audio and frame rate in a small popover menu;
   // inside the mobile dialog the same controls are listed directly.
   function setSettingsOpen(open) {
@@ -252,14 +271,10 @@ async function mount() {
     setSettingsOpen(false);
     localButton.disabled = mobileControls.matches;
     localButton.title = mobileControls.matches ? 'Nur mit Tastatur verfügbar' : '';
-    if (mobileControls.matches) {
-      document.getElementById('menu-actions').append(actions);
-      document.getElementById('mobile-instructions').append(instructions, rules);
-    } else {
+    if (mobileControls.matches) document.getElementById('menu-actions').append(actions);
+    else {
       menu.close();
       controls.insertBefore(actions, menuButton);
-      game.insertBefore(instructions, arena);
-      game.append(rules);
     }
   }
   arrangeControls();
@@ -275,9 +290,26 @@ async function mount() {
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) menu.close();
   });
   actions.addEventListener('click', event => {
-    if (event.target.closest('#pause-button, #reset-button, #leaderboard-open, #feedback-open')) menu.close();
-    if (event.target.closest('#leaderboard-open, #feedback-open')) setSettingsOpen(false);
+    if (event.target.closest('#pause-button, #reset-button, #leaderboard-open, #feedback-open, #help-open')) menu.close();
+    if (event.target.closest('#leaderboard-open, #feedback-open, #help-open')) setSettingsOpen(false);
   }, { capture: true });
+  // Controls and rules live in their own dialog; opening it pauses like feedback.
+  const helpOpen = document.getElementById('help-open');
+  helpOpen.addEventListener('click', () => {
+    stopForVisibility();
+    helpDialog.showModal();
+  });
+  document.getElementById('help-close').addEventListener('click', () => helpDialog.close());
+  helpDialog.addEventListener('click', event => {
+    if (event.target !== helpDialog) return;
+    const rect = helpDialog.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) helpDialog.close();
+  });
+  helpDialog.addEventListener('close', () => {
+    if (mobileControls.matches) menuButton.focus({ preventScroll: true });
+    else helpOpen.focus({ preventScroll: true });
+    syncMusic();
+  });
   const leaderboard = mountLeaderboard({ pauseGame: stopForVisibility, getDifficulty: () => difficulty });
   mountFeedback({
     pauseGame: stopForVisibility,
@@ -307,7 +339,7 @@ async function mount() {
     const message = local && ['point', 'over'].includes(state.phase)
       ? state.message.replace(/^(Dein Punkt|Punkt Computer)/, state.winner === 1 ? 'Punkt Pfeiltasten' : 'Punkt WASD') : state.message;
     if (!online && status.textContent !== message) status.textContent = message;
-    showPower(power, powerLabel, state.teams[1].power);
+    showPower(power, powerLabel, ownBody().power);
     if (local) showPower(opponentPower, document.getElementById('opponent-power-label'), state.teams[0].power);
     updateLobIndicators();
     document.getElementById('start-gameplay').hidden = !!online || !!localCountdown || state.phase !== 'ready';
@@ -354,7 +386,7 @@ async function mount() {
       overlayTitle.textContent = 'Pause'; overlayText.textContent = `Variante ${gameplayConfig(state.variant).label} · ${local ? 'Gemeinsame Pause. Weiter mit Leertaste / P oder dem Button.' : 'Kurz durchatmen. Dein Spiel wartet.'}`;
       startButton.textContent = 'Weiterspielen';
     } else if (state.phase === 'ready') {
-      overlayTitle.textContent = local ? 'Zu zweit bereit?' : 'Bereit?'; overlayText.textContent = local ? 'Gelb unten: Pfeiltasten. Korall oben: WASD. Ihr trefft automatisch.' : 'Dein Doppel ist gelb. Triff den Ball automatisch.';
+      overlayTitle.textContent = local ? 'Zu zweit bereit?' : 'Bereit?'; overlayText.textContent = local ? 'Links WASD, rechts Pfeiltasten. Jeder spielt auf seinem Feld unten und trifft automatisch.' : 'Dein Doppel ist gelb. Triff den Ball automatisch.';
       startButton.textContent = local ? 'Spiel starten' : 'Gegen Computer';
     }
   }
@@ -426,6 +458,7 @@ async function mount() {
   window.addEventListener('pagehide', () => { online?.leave(); sounds.stopAll(); musicVoice = null; stopForVisibility(); });
   function setText(element, value) { if (element.textContent !== value) element.textContent = value; }
   function updateOnline() {
+    if (online.doubles) { updateDoubles(); return; }
     displayedPhase = state.phase;
     const stage = online.stage;
     const interrupted = online.suspended;
@@ -455,6 +488,63 @@ async function mount() {
     setText(overlayText, stage === 'over' ? `${state.score[1]} : ${state.score[0]} · Spielzeit ${formatDuration(Math.round(state.time * 1000))}` : online.message);
     setText(status, interrupted || stage !== 'playing' ? online.message : state.message);
   }
+  function seatStatus(entry) {
+    if (!entry) return '';
+    return entry.away ? 'abwesend' : entry.ready ? 'bereit' : 'wartet';
+  }
+  function updateDoubles() {
+    displayedPhase = state.phase;
+    const stage = online.stage, interrupted = online.interrupted;
+    overlay.classList.add('online-overlay', 'doubles-overlay');
+    overlay.hidden = ['playing', 'countdown'].includes(stage) && !interrupted;
+    const lobbyVisible = ['waiting', 'paused', 'over'].includes(stage) && !interrupted && online.seat !== null;
+    roomInfo.hidden = !lobbyVisible;
+    doublesLobby.hidden = !lobbyVisible;
+    setText(document.getElementById('room-code'), online.code);
+    const count = online.playerCount, readyCount = online.seats.filter(s => s?.ready).length;
+    setText(document.getElementById('room-players'), count < 4 ? `${count} von 4 Spielern · ${readyCount} bereit` : `4 von 4 Spielern · ${readyCount} bereit`);
+    const movable = online.canChangeSeat;
+    seatButtons.forEach(button => {
+      const seat = Number(button.dataset.seat), entry = online.seats[seat], own = seat === online.seat;
+      const who = entry ? (own ? 'Du' : `Spieler ${entry.n}`) : 'Frei';
+      const status = seatStatus(entry);
+      setText(button.querySelector('.seat-lane'), status ? `${seatLaneName(seat)} · ${status}` : seatLaneName(seat));
+      setText(button.querySelector('.seat-player'), who);
+      button.classList.toggle('is-empty', !entry);
+      button.classList.toggle('is-self', own);
+      button.classList.toggle('is-ready', Boolean(entry?.ready));
+      button.classList.toggle('is-away', Boolean(entry?.away));
+      button.disabled = !movable || own;
+      const action = own ? 'Dein Platz' : !movable ? '' : entry ? 'Platz tauschen' : 'Hierher wechseln';
+      button.setAttribute('aria-label', `Team ${seatTeamName(seat)}, ${seatLaneName(seat).toLowerCase()}: ${who}${status ? `, ${status}` : ''}${action ? `. ${action}` : ''}`);
+      button.title = action;
+    });
+    setText(document.getElementById('doubles-lobby-hint'), movable ? 'Tippe auf einen Platz, um zu wechseln oder zu tauschen.' : 'Plätze sind während der Partie fest.');
+    shuffleButton.hidden = online.role !== 'host' || !movable;
+    shuffleButton.disabled = count < 2;
+    document.body.classList.toggle('doubles-korall', online.seat !== null && online.seat >= 2);
+    const own = online.seat === null ? '' : `Team ${seatTeamName(online.seat)}`;
+    setText(document.getElementById('human-label'), own ? own.replace('Team ', '').toUpperCase() : 'IHR');
+    setText(document.getElementById('opponent-label'), online.seat === null ? 'GEGNER' : (online.seat < 2 ? 'KORALL' : 'GELB'));
+    document.getElementById('enter-win').hidden = true;
+    document.getElementById('leaderboard-after-game').hidden = true;
+    gameOverBackButton.hidden = true;
+    leaveButton.hidden = false;
+    startButton.hidden = !['waiting', 'paused', 'over'].includes(stage) || interrupted || online.seat === null;
+    startButton.disabled = !online.connected || interrupted || !online.visible;
+    setText(startButton, online.ready ? 'Doch nicht bereit' : stage === 'over' ? 'Bereit zur Revanche' : stage === 'paused' ? 'Bereit zum Weiterspielen' : 'Bereit');
+    pauseButton.disabled = !['playing', 'countdown'].includes(stage);
+    setText(pauseButton, 'Pause'); resetButton.hidden = false; resetButton.disabled = false;
+    const titles = { connecting: 'Verbinden …', waiting: '2v2 Warteraum', countdown: 'Gleich geht’s los', paused: 'Pause', over: state.winner === 1 ? 'Gewonnen!' : 'Revanche?', ended: 'Spiel beendet' };
+    const countdown = countdownLabel(ONLINE.countdown - Math.max(0, online.countdownUntil - online.now()), ONLINE.countdown);
+    countdownDisplay.hidden = interrupted || stage !== 'countdown';
+    if (stage === 'countdown' && !interrupted) setText(countdownDisplay, countdown);
+    setText(overlayTitle, interrupted ? 'Verbindung fehlt' : titles[stage] || '');
+    const ownEntry = online.seat === null ? null : online.seats[online.seat];
+    const team = ownEntry ? ` · Du bist Spieler ${ownEntry.n}, ${seatLaneName(online.seat).toLowerCase()} in Team ${seatTeamName(online.seat)}` : '';
+    setText(overlayText, stage === 'over' ? `${state.score[1]} : ${state.score[0]} · Spielzeit ${formatDuration(Math.round(state.time * 1000))}` : `${online.message}${['waiting', 'paused'].includes(stage) && !interrupted ? team : ''}`);
+    setText(status, interrupted || stage !== 'playing' ? online.message : state.message);
+  }
   function updateOverlayChoices() {
     const initialSelection = !online && !onlineSetup && !localCountdown && !local && state.phase === 'ready';
     primaryOverlayContent.hidden = onlineSetup || !!localCountdown;
@@ -463,13 +553,16 @@ async function mount() {
     onlineSetupPanel.hidden = !onlineSetup;
     localBackButton.hidden = !!localCountdown || !(local && state.phase === 'ready');
   }
-  function showOnlineSetup() {
+  function showOnlineSetup(mode = 'duel') {
     stopForVisibility(); menu.close();
-    onlineSetup = true;
+    onlineSetup = true; onlineMode = mode;
     document.getElementById('join-message').textContent = '';
+    document.getElementById('online-explanation').textContent = mode === 'doubles'
+      ? 'Eine Person erstellt das Spiel, drei weitere treten mit dem Raumcode bei. Jede Person steuert einen Balken; die Teams wählt ihr im Warteraum.'
+      : 'Eine Person erstellt das Spiel. Die andere tritt mit dem Raumcode bei.';
     overlay.classList.add('setup-overlay');
     overlay.hidden = false;
-    overlayTitle.textContent = 'Online';
+    overlayTitle.textContent = mode === 'doubles' ? '2v2 Online' : '1v1 Online';
     updateOverlayChoices();
     document.getElementById('create-room').focus({ preventScroll: true });
   }
@@ -485,8 +578,9 @@ async function mount() {
   function exitRoom() {
     const room = online; online = null; room?.leave(); clearInterval(networkTimer); networkTimer = null;
     cancelAnimationFrame(frameId); frameId = 0; previous = null;
-    reset(state); computer.reset(); leaderboard.reset(); input.clear(); simulation.reset(); roundId = crypto.randomUUID();
-    onlineSetup = false; overlay.classList.remove('online-overlay', 'setup-overlay'); roomInfo.hidden = true; leaveButton.hidden = true;
+    reset(state, { variant: gameplay, doubles: false }); computer.reset(); leaderboard.reset(); input.clear(); simulation.reset(); roundId = crypto.randomUUID();
+    onlineSetup = false; overlay.classList.remove('online-overlay', 'setup-overlay', 'doubles-overlay'); roomInfo.hidden = true; leaveButton.hidden = true;
+    doublesLobby.hidden = true; setDoublesMode(false);
     startButton.hidden = false; startButton.disabled = false;
     resetButton.hidden = false;
     document.getElementById('opponent-label').textContent = 'CPU'; displayedPhase = '';
@@ -496,7 +590,8 @@ async function mount() {
     if (online) return;
     try {
       code = normalizeCode(code);
-      const room = new OnlineSession({ role, code, config: window.PADEL_SUPABASE_CONFIG, readInput: () => input.read(), onChange: () => {
+      const Session = onlineMode === 'doubles' ? DoublesSession : OnlineSession;
+      const room = new Session({ role, code, config: window.PADEL_SUPABASE_CONFIG, readInput: () => input.read(), onChange: () => {
         if (!online) return;
         if (online.closed) clearInterval(networkTimer);
         if (!frameId || document.hidden) { update(); render(state); }
@@ -505,9 +600,11 @@ async function mount() {
       stopForVisibility(); leaderboard.reset(); input.clear();
       onlineSetup = false; setLocalMode(false);
       online = room; previous = null; displayedPhase = '';
+      setDoublesMode(Boolean(room.doubles));
       overlay.classList.remove('setup-overlay'); menu.close();
       online.setVisible(!document.hidden);
-      networkTimer = setInterval(() => online?.tick(), 50);
+      // 2v2 paces snapshots and inputs itself, so it needs a finer timer.
+      networkTimer = setInterval(() => online?.tick(), room.doubles ? 16 : 50);
       resetSoundTracking(); update(); render(state); schedule(); canvas.focus({ preventScroll: true });
     } catch (error) { document.getElementById('join-message').textContent = error.message; }
   }
@@ -517,10 +614,20 @@ async function mount() {
     document.getElementById('human-label').textContent = enabled ? 'PFEILE' : 'DU';
     document.getElementById('opponent-label').textContent = enabled ? 'WASD' : 'CPU';
     document.getElementById('local-instruction').hidden = !enabled;
+    opponentCanvas.hidden = !enabled;
     document.getElementById('opponent-power-display').hidden = !enabled;
     document.getElementById('power-caption').textContent = enabled ? 'PFEILE · DRUCK' : 'SCHLAGDRUCK';
     canvas.setAttribute('aria-label', enabled
-      ? 'PadelPong zu zweit. Gelb unten mit Pfeiltasten, Korall oben mit WASD. Leertaste oder P pausiert für beide.'
+      ? 'PadelPong zu zweit. Zwei gedrehte Ansichten desselben Spielfelds: links Korall mit WASD, rechts Gelb mit Pfeiltasten, jeweils unten. Leertaste oder P pausiert für beide.'
+      : 'PadelPong. Du spielst unten mit den gelben Balken. Bewegen mit Pfeiltasten oder WASD.');
+  }
+  function setDoublesMode(enabled) {
+    document.body.classList.toggle('online-doubles', enabled);
+    if (!enabled) document.body.classList.remove('doubles-korall');
+    document.getElementById('doubles-instruction').hidden = !enabled;
+    document.getElementById('human-label').textContent = enabled ? 'IHR' : 'DU';
+    canvas.setAttribute('aria-label', enabled
+      ? 'PadelPong 2 gegen 2. Dein Team spielt unten. Du steuerst den mit einem weißen Pfeil markierten Balken mit Pfeiltasten, WASD oder durch Ziehen.'
       : 'PadelPong. Du spielst unten mit den gelben Balken. Bewegen mit Pfeiltasten oder WASD.');
   }
   function chooseLocalMode(enabled) {
@@ -545,8 +652,8 @@ async function mount() {
       button.setAttribute('aria-pressed', String(selected));
       button.classList.toggle('active', selected);
     }
-    onlineButton.disabled = special;
-    onlineButton.title = special ? 'Online nur mit Standard' : '';
+    onlineButton.disabled = special; doublesButton.disabled = special;
+    onlineButton.title = doublesButton.title = special ? 'Online nur mit Standard' : '';
     for (const element of document.querySelectorAll('.lob-help')) element.hidden = !special;
   }
   function selectGameplay(value) {
@@ -575,7 +682,10 @@ async function mount() {
   syncGameplay();
   localButton.addEventListener('click', () => chooseLocalMode(true));
   localBackButton.addEventListener('click', () => chooseLocalMode(false));
-  onlineButton.addEventListener('click', showOnlineSetup);
+  onlineButton.addEventListener('click', () => showOnlineSetup('duel'));
+  doublesButton.addEventListener('click', () => showOnlineSetup('doubles'));
+  for (const button of seatButtons) button.addEventListener('click', () => online?.doubles && online.requestSeat(Number(button.dataset.seat)));
+  shuffleButton.addEventListener('click', () => online?.doubles && online.shuffleTeams());
   gameOverBackButton.addEventListener('click', showModeSelection);
   document.getElementById('online-back').addEventListener('click', showModeSelection);
   document.getElementById('create-room').addEventListener('click', () => enterRoom('host', generateCode()));
@@ -589,7 +699,7 @@ async function mount() {
     catch { status.textContent = `Raumcode: ${online.code}`; }
   });
   startButton.disabled = false; resetButton.disabled = false; menuButton.disabled = false;
-  onlineButton.disabled = gameplay === GAMEPLAY.lobSmash.id; localButton.disabled = mobileControls.matches;
+  onlineButton.disabled = doublesButton.disabled = gameplay === GAMEPLAY.lobSmash.id; localButton.disabled = mobileControls.matches;
   update(); render(state);
 }
 mount().catch(error => {

@@ -1,5 +1,5 @@
-import { C, clamp, createState, createClock, start, pause, reset, step, moveTeam, predictLanding } from './physics.mjs?v=2026-10-11-lob-smash';
-import { connectRealtime } from './realtime.mjs?v=2026-09-12-rules-v2';
+import { C, clamp, createState, createClock, start, pause, reset, step, moveTeam, predictLanding } from './physics.mjs?v=2026-11-12-doubles';
+import { connectRealtime } from './realtime.mjs?v=2026-11-12-doubles';
 import { RULESET } from './ruleset.mjs?v=2026-09-12-rules-v2';
 import { COUNTDOWN_DURATION_MS } from './audio.mjs?v=2026-09-13-sound-effects';
 import { GAMEPLAY } from './gameplay.mjs';
@@ -34,13 +34,17 @@ export function perspective(state, side) {
   if (['point', 'over'].includes(view.phase)) view.message = `${view.winner === 1 ? 'Dein Punkt' : 'Punkt Gegner'} · ${view.message.split(' · ').slice(1).join(' · ')}`;
   return view;
 }
-export function validSnapshot(s) {
+const BODY_KEYS = ['offset', 'y', 'vx', 'vy', 'power'];
+export function validSnapshot(s, { doubles = false } = {}) {
   const finite = (o, keys) => o && keys.every(k => Number.isFinite(o[k]) && Math.abs(o[k]) < 1e6);
-  return s && s.ruleset === RULESET && (s.variant === undefined || s.variant === GAMEPLAY.standard.id) && ['ready', 'rally', 'point', 'paused', 'over'].includes(s.phase)
+  const validTeam = (t, i) => t?.side === i && (doubles
+    ? Array.isArray(t.players) && t.players.length === 2 && t.players.every(p => p?.side === i && finite(p, BODY_KEYS))
+    : t.players === undefined && finite(t, BODY_KEYS));
+  return s && s.ruleset === RULESET && (doubles ? s.doubles === true : s.doubles === undefined) && (s.variant === undefined || s.variant === GAMEPLAY.standard.id) && ['ready', 'rally', 'point', 'paused', 'over'].includes(s.phase)
     && ['rally', 'point'].includes(s.resumePhase) && [null, 0, 1].includes(s.winner)
     && Array.isArray(s.score) && s.score.length === 2 && s.score.every(n => Number.isInteger(n) && n >= 0 && n <= 7)
     && finite(s, ['time', 'pointTimer', 'rallyHits', 'bestRally', 'effectSequence']) && s.time >= 0 && Number.isInteger(s.effectSequence) && s.effectSequence >= 0
-    && Array.isArray(s.teams) && s.teams.length === 2 && s.teams.every((t, i) => t.side === i && finite(t, ['offset', 'y', 'vx', 'vy', 'power']))
+    && Array.isArray(s.teams) && s.teams.length === 2 && s.teams.every(validTeam)
     && finite(s.ball, ['x', 'y', 'z', 'vx', 'vy', 'vz', 'bounces']) && [0, 1].includes(s.ball.lastHit) && (s.ball.shotType === undefined || ['feed', 'normal'].includes(s.ball.shotType))
     && typeof s.ball.feed === 'boolean' && typeof s.message === 'string' && s.message.length < 200
     && (s.pendingLob === undefined || (Array.isArray(s.pendingLob) && s.pendingLob.length === 2 && s.pendingLob.every(value => value === false)))
